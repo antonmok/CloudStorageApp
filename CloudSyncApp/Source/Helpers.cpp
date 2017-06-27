@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "Helpers.h"
 #include <iostream>
+#include <string>
+#include <Shobjidl.h>
 
 void s2ws(const std::string& str, std::wstring& outStr)
 {
@@ -109,4 +111,46 @@ std::vector<BYTE> base64_decode(std::string const& encoded_string) {
 	}
 
 	return ret;
+}
+
+bool SelectPathDialog(std::wstring& path)
+{
+	IFileDialog *pfd;
+	WCHAR* pathBuf = NULL;
+	std::wstring szEXEDesc(L"Executable file");
+
+	/*COMDLG_FILTERSPEC rgSpec[] = {
+		{ szEXEDesc.c_str(), L"*.exe" },
+	};*/
+
+	HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+
+	if (SUCCEEDED(hr)) {
+
+		/*if (!SUCCEEDED(pfd->SetFileTypes(1, rgSpec))) {
+			return false;
+		}*/
+
+		DWORD dwOptions;
+		if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
+		{
+			pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
+		}
+
+		if (SUCCEEDED(pfd->Show(NULL))) {
+			IShellItem *psi;
+			if (SUCCEEDED(pfd->GetResult(&psi))) {
+				if (SUCCEEDED(psi->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &pathBuf))) {
+					path.assign(pathBuf);
+					CoTaskMemFree(pathBuf);
+
+					return true;
+				}
+				psi->Release();
+			}
+		}
+		pfd->Release();
+	}
+
+	return false;
 }

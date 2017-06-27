@@ -25,6 +25,9 @@ public:
 	const std::wstring& GetUserID();
 	const std::wstring& GetPass();
 
+	void SetSyncPath(const std::wstring& szPath);
+	const std::wstring& GetSyncPath();
+
 private:
 	
 	CSettingsHandler() {};
@@ -32,5 +35,6 @@ private:
 
 	std::wstring userID;
 	std::wstring pass;
+	std::wstring syncPath;
 
 };

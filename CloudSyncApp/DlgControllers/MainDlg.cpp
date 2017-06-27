@@ -152,6 +152,22 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
 			return (INT_PTR)TRUE;
 
+		case IDC_BUTTON_UPFOLDER:
+			
+			SelectPathDialog(path);
+			settingsHandler.SetSyncPath(path);
+			SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + path).c_str());
+			EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
+
+			return (INT_PTR)TRUE;
+
+		case IDC_BUTTON_UPLOAD:
+
+			/*if (settingsHandler.GetSyncPath() == L"") {
+
+			}*/
+			return (INT_PTR)TRUE;
+
 		// Settings menu
 		/*case IDM_SETTINGS:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_SETTINGS), hDlg, SettingsDlgProc);

@@ -113,6 +113,16 @@ void CSettingsHandler::InitSettings()
 	}
 }
 
+void CSettingsHandler::SetSyncPath(const std::wstring& szPath)
+{
+	syncPath.assign(szPath);
+}
+
+const std::wstring& CSettingsHandler::GetSyncPath()
+{
+	return syncPath;
+}
+
 bool CSettingsHandler::HaveCredentials()
 {
 	if (userID.size() > 0 && pass.size() > 0) {
