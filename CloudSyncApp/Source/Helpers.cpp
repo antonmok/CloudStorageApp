@@ -20,8 +20,6 @@ void ws2s(const std::wstring& wstr, std::string& outStr)
 	outStr.assign(converterX.to_bytes(wstr));
 }
 
-
-
 static const std::string base64_chars =
 "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 "abcdefghijklmnopqrstuvwxyz"
@@ -153,4 +151,23 @@ bool SelectPathDialog(std::wstring& path)
 	}
 
 	return false;
+}
+
+
+int ScaleDPI(int x)
+{
+	HDC screen = GetDC(0);
+
+	int dpiX = GetDeviceCaps(screen, LOGPIXELSX);
+	ReleaseDC(0, screen);
+
+	return MulDiv(x, MulDiv(dpiX, 100, 96), 100);
+}
+
+RECT GetCtrlLocalCoordinates(HWND hWnd)
+{
+	RECT Rect;
+	GetWindowRect(hWnd, &Rect);
+	MapWindowPoints(HWND_DESKTOP, GetParent(hWnd), (LPPOINT)&Rect, 2);
+	return Rect;
 }

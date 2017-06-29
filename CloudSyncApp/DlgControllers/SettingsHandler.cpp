@@ -1,8 +1,10 @@
+#define NOMINMAX
 #include "stdafx.h"
 #include "resource.h"
 #include "SettingsHandler.h"
 #include <string>
 #include <Shlobj.h>
+#include "Helpers.h"
 
 #include <cereal/types/unordered_map.hpp>
 #include <cereal/types/memory.hpp>
@@ -86,6 +88,7 @@ void CSettingsHandler::SaveSettings()
 
 	SettingsData settData;
 
+	// TODO: use base64_encode
 	settData.login = userID;
 	settData.pass = pass;
 

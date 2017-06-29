@@ -24,6 +24,8 @@
 ;--------------------------------
 ;Pages
 
+  !define MUI_PAGE_CUSTOMFUNCTION_SHOW ModifyWelcome
+  !define MUI_PAGE_CUSTOMFUNCTION_LEAVE LeaveWelcome
   !insertmacro MUI_PAGE_WELCOME
   !insertmacro MUI_PAGE_INSTFILES
   !insertmacro MUI_PAGE_FINISH
@@ -40,9 +42,28 @@
 ;Installer Sections
 Var prodName
 Var fileDesc
+Var mycheckbox
+Var mycheckboxState
+
+Function ModifyWelcome
+    ${NSD_CreateCheckbox} 120u -18u 50% 12u "Create Desktop and Program Menu shortcuts."
+    Pop $mycheckbox
+    SetCtlColors $mycheckbox "" ${MUI_BGCOLOR}
+    ${NSD_Check} $mycheckbox ; Check it by default
+FunctionEnd
+
+Function LeaveWelcome
+  ${NSD_GetState} $mycheckbox $0
+  ${If} $0 <> 0
+    StrCpy $mycheckboxState "1"
+  ${Else}
+    StrCpy $mycheckboxState "0"
+  ${EndIf}
+FunctionEnd
 
 !define logData "!insertmacro logData"
 !macro logData string
+
   FileOpen $fileDesc "$TEMP\nsisInstaller.log" a
   FileSeek $fileDesc 0 END
   
@@ -78,6 +99,7 @@ Section "CloudSyncApp" SecDummy  # installation
   File "zlib1.dll"
   File "sqlite3.dll"
   File CloudSyncApp.exe
+  File app.ico
   
   ${logData} "done write files"
   ;Create uninstaller
@@ -92,7 +114,13 @@ Section "CloudSyncApp" SecDummy  # installation
   
   CreateDirectory "$SMPROGRAMS\$prodName"
   CreateShortCut "$SMPROGRAMS\$prodName\Uninstall.lnk" "$PROGRAMFILES\$prodName\Uninstall.exe" \
-  "" "$WINDIR\Uninstall.exe" 0 SW_SHOWNORMAL
+                   "" "$WINDIR\Uninstall.exe" 0 SW_SHOWNORMAL
+
+  ${If} $mycheckboxState == "1"
+    CreateShortCut "$SMPROGRAMS\$prodName\CloudSyncApp.lnk" "$PROGRAMFILES\$prodName\CloudSyncApp.exe" "" "$PROGRAMFILES\$prodName\app.ico"
+    CreateShortCut "$DESKTOP\CloudSyncApp.lnk" "$PROGRAMFILES\$prodName\CloudSyncApp.exe" "" "$PROGRAMFILES\$prodName\app.ico"
+  ${EndIf}
+
 SectionEnd
 
 ;--------------------------------
@@ -113,12 +141,14 @@ Section "Uninstall"
     ${logData} "uninst local res"
 	
     Delete "$PROGRAMFILES\$prodName\CloudSyncApp.exe"
+    Delete "$PROGRAMFILES\$prodName\app.ico"
     Delete "$PROGRAMFILES\$prodName\Uninstall.exe"
     Delete "$PROGRAMFILES\$prodName\libssh2.dll"
     Delete "$PROGRAMFILES\$prodName\libeay32.dll"
     Delete "$PROGRAMFILES\$prodName\ssleay32.dll"
     Delete "$PROGRAMFILES\$prodName\zlib1.dll"
     Delete "$PROGRAMFILES\$prodName\sqlite3.dll"
+    Delete "$DESKTOP\CloudSyncApp.lnk"
     
     RMDir /r "$SMPROGRAMS\$prodName"
     RMDir /r "$PROGRAMFILES\$prodName"

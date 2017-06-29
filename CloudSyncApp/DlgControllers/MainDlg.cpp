@@ -122,6 +122,7 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		if (!loginHandler.IsLoggedIn()) {
 			if (settingsHandler.HaveCredentials()) {
 				loginHandler.LogIn(settingsHandler.GetUserID(), settingsHandler.GetPass());
+				SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), loginHandler.loginTrace.c_str());
 			} else {
 				DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc);
 			}
@@ -129,17 +130,22 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		
 		return (INT_PTR)TRUE;
 
+	case UM_LOGIN_COMPLETE:
+		SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), loginHandler.loginTrace.c_str());
+		return (INT_PTR)TRUE;
+
 	case WM_ACTIVATE:
 		if (wParam != WA_INACTIVE) {
 			PostMessage(hDlg, UM_CHECK_LOGIN, NULL, NULL);
 		}
-		return (INT_PTR)TRUE;
+		return (INT_PTR)FALSE;
 
 	case WM_COMMAND:
 
 		switch (LOWORD(wParam))
 		{
 		case IDCANCEL:
+			loginHandler.LogOut();
 			EndDialog(hDlg, LOWORD(wParam));
 			PostQuitMessage(0);
 			return (INT_PTR)TRUE;

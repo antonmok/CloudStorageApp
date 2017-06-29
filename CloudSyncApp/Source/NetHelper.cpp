@@ -49,7 +49,7 @@ bool PostHttps(const std::string& url, const std::string& postFields, std::strin
 	curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
 
 	// disable peer verification
-	curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
+	//curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
 
 	/* send all data to this function  */
 	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);

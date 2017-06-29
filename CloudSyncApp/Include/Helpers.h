@@ -14,3 +14,7 @@ std::string base64_encode(BYTE const* buf, unsigned int bufLen);
 std::vector<BYTE> base64_decode(std::string const&);
 
 bool SelectPathDialog(std::wstring& path);
+
+int ScaleDPI(int x);
+
+RECT GetCtrlLocalCoordinates(HWND hWnd);
