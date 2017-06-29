@@ -121,8 +121,14 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 	case UM_CHECK_LOGIN:
 		if (!loginHandler.IsLoggedIn()) {
 			if (settingsHandler.HaveCredentials()) {
-				loginHandler.LogIn(settingsHandler.GetUserID(), settingsHandler.GetPass());
-				SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), loginHandler.loginTrace.c_str());
+				if (loginHandler.LogIn(settingsHandler.GetUserID(), settingsHandler.GetPass())) {
+					SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), loginHandler.loginTrace.c_str());
+				} else {
+					settingsHandler.SetCreds(L"", L"");
+					settingsHandler.SaveSettings();
+					DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc);
+				}
+				
 			} else {
 				DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc);
 			}
