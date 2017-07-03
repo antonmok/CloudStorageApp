@@ -9,18 +9,6 @@
 #include "cereal/external/rapidjson/document.h"
 #include "cereal/external/rapidjson/reader.h"
 
-#define BASE_URL		"http://13.59.116.57:3000/api"
-
-#define METHOD_LOGIN	"/login"
-#define METHOD_LOGOUT	"/logout"
-#define METHOD_SIGNUP	"/signup"
-
-#define PARAM_EMAIL		"email"
-#define PARAM_PASS		"password"
-#define PARAM_FNAME		"first_name"
-#define PARAM_LNAME		"last_name"
-#define PARAM_TOKEN		"token"
-
 void SwitchGUIStateToSignin(HWND hDlg)
 {
 	ShowWindow(GetDlgItem(hDlg, IDC_STATIC_FNAME), 0);
@@ -172,10 +160,6 @@ void CLoginHandler::SetHaveAccount(bool value)
 
 bool CLoginHandler::LogIn(const std::wstring& userID, const std::wstring& pass)
 {
-	/*token = "";
-	LogOut();
-	*/
-
 	if (!IsCredsValid(userID, pass)) {
 		return false;
 	}
@@ -196,13 +180,13 @@ bool CLoginHandler::LogIn(const std::wstring& userID, const std::wstring& pass)
 			return false;
 		}
 
-		if (doc.HasMember("success") && doc["success"].IsNumber()) {
+		if (doc.HasMember(FIELD_SUCCESS) && doc[FIELD_SUCCESS].IsNumber()) {
 			if (doc["success"].GetInt() == 1) {
 
-				rapidjson::Value::ConstMemberIterator itrData = doc.FindMember("data");
+				rapidjson::Value::ConstMemberIterator itrData = doc.FindMember(FIELD_DATA);
 				if (itrData != doc.MemberEnd()) {
 
-					rapidjson::Value::ConstMemberIterator itr = itrData->value.FindMember("token");
+					rapidjson::Value::ConstMemberIterator itr = itrData->value.FindMember(FIELD_TOKEN);
 					if (itrData != itrData->value.MemberEnd()) {
 						if (itr->value.IsString()) {
 							loggedIn = true;
@@ -251,7 +235,7 @@ bool CLoginHandler::SignUp(const std::wstring& userID, const std::wstring& pass,
 			return false;
 		}
 
-		if (doc.HasMember("success") && doc["success"].IsNumber()) {
+		if (doc.HasMember(FIELD_SUCCESS) && doc[FIELD_SUCCESS].IsNumber()) {
 			if (doc["success"].GetInt() == 1) {
 				return true;
 			}

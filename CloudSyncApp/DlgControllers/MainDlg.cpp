@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "resource.h"
 #include <CommCtrl.h>
+#include <vector>
 
 #include "MainDlg.h"
 #include "SettingsHandler.h"
@@ -19,6 +20,7 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #define TIMER_ID		14
 
 #define UM_CHECK_LOGIN	WM_APP + 1
+#define UM_UPLOAD_FILES	WM_APP + 3
 
 // Global Variables:
 HINSTANCE hInst;								// current instance
@@ -82,7 +84,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 void InitGUIControls(HWND hDlg)
 {
-	
+	if (settingsHandler.GetSyncPath() != L"") {
+		SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + settingsHandler.GetSyncPath()).c_str());
+		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
+	}
 }
 
 void SetMainWindowPos(HWND hWnd)
@@ -98,6 +103,64 @@ void SetMainWindowPos(HWND hWnd)
 	int wndHeight = wndRect.bottom - wndRect.top;
 	
 	SetWindowPos(hWnd, NULL, width / 2 - wndWidth / 2, height / 2 - wndHeight / 2, 0, 0, SWP_NOSIZE);
+}
+
+bool UploadFiles(HWND hDlg) {
+
+	std::vector<std::string> files;
+	std::wstring path(settingsHandler.GetSyncPath());
+	std::string resData;
+	std::string resDataTotal;
+
+	WIN32_FIND_DATA ffd;
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	DWORD dwError = 0;
+	
+
+	path.append(L"\\*");
+	hFind = FindFirstFile(path.c_str(), &ffd);
+
+	if (INVALID_HANDLE_VALUE == hFind) {
+		MessageBox(hDlg, L"Upload directory access error", L"Error", MB_ICONEXCLAMATION);
+		return false;
+	}
+
+	// List all the files in the directory
+	do {
+		if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			// sub dir
+		} else {
+			std::string fileName;
+
+			ws2s(settingsHandler.GetSyncPath() + L"\\" + ffd.cFileName, fileName);
+			files.push_back(fileName);
+		}
+	} while (FindNextFile(hFind, &ffd) != 0);
+
+	dwError = GetLastError();
+	if (dwError != ERROR_NO_MORE_FILES) {
+		OutputDebugString(L"File access error");
+	}
+
+	FindClose(hFind);
+
+	if (files.size()) {
+
+		for (auto fileName : files) {
+			UploadFile(std::string(BASE_URL) + METHOD_UPLOAD, fileName, loginHandler.GetToken(), resData);
+			resDataTotal.append(resData + "\r\n");
+		}
+		
+	} else {
+		MessageBox(hDlg, L"Upload directory is empty", L"Error", MB_ICONEXCLAMATION);
+		return false;
+	}
+
+	SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), ("Upload file responce:\r\n" + resDataTotal).c_str());
+	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), TRUE);
+	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), L"Upload Folder");
+
+	return true;
 }
 
 // Message handler
@@ -118,11 +181,15 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
 		return (INT_PTR)TRUE;
 
+	case UM_UPLOAD_FILES:
+		UploadFiles(hDlg);
+		return (INT_PTR)TRUE;
+
 	case UM_CHECK_LOGIN:
 		if (!loginHandler.IsLoggedIn()) {
 			if (settingsHandler.HaveCredentials()) {
 				if (loginHandler.LogIn(settingsHandler.GetUserID(), settingsHandler.GetPass())) {
-					SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), loginHandler.loginTrace.c_str());
+					SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), ("Sign In responce:\r\n" + loginHandler.loginTrace).c_str());
 				} else {
 					settingsHandler.SetCreds(L"", L"");
 					settingsHandler.SaveSettings();
@@ -137,7 +204,7 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		return (INT_PTR)TRUE;
 
 	case UM_LOGIN_COMPLETE:
-		SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), loginHandler.loginTrace.c_str());
+		SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), ("Sign In responce:\r\n" + loginHandler.loginTrace).c_str());
 		return (INT_PTR)TRUE;
 
 	case WM_ACTIVATE:
@@ -168,6 +235,7 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 			
 			SelectPathDialog(path);
 			settingsHandler.SetSyncPath(path);
+			settingsHandler.SaveSettings();
 			SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + path).c_str());
 			EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
 
@@ -175,9 +243,10 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
 		case IDC_BUTTON_UPLOAD:
 
-			/*if (settingsHandler.GetSyncPath() == L"") {
+			EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), FALSE);
+			SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), L"Uploading...");
+			PostMessage(hDlg, UM_UPLOAD_FILES, NULL, NULL);
 
-			}*/
 			return (INT_PTR)TRUE;
 
 		// Settings menu

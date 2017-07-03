@@ -18,14 +18,15 @@ bool SelectPathDialog(std::wstring& path);
 
 struct SettingsData
 {
-	std::wstring login;
-	std::wstring pass;
+	std::string login;
+	std::string pass;
+	std::string syncPath;
 
 	// This method lets cereal know which data members to serialize
 	template<class Archive>
 	void serialize(Archive & archive)
 	{
-		archive(login, pass); // serialize things by passing them to the archive
+		archive(login, pass, syncPath); // serialize things by passing them to the archive
 	}
 };
 
@@ -87,10 +88,17 @@ void CSettingsHandler::SaveSettings()
 	cereal::BinaryOutputArchive oarchive(os);
 
 	SettingsData settData;
+	std::string userIDNarrow;
+	std::string passNarrow;
+	std::string syncPathNarrow;
 
-	// TODO: use base64_encode
-	settData.login = userID;
-	settData.pass = pass;
+	ws2s(userID, userIDNarrow);
+	ws2s(pass, passNarrow);
+	ws2s(syncPath, syncPathNarrow);
+
+	settData.login = base64_encode((const unsigned char*)userIDNarrow.c_str(), userIDNarrow.size());
+	settData.pass = base64_encode((const unsigned char*)passNarrow.c_str(), passNarrow.size());
+	settData.syncPath = base64_encode((const unsigned char*)syncPathNarrow.c_str(), syncPathNarrow.size());
 
 	oarchive(settData);
 	os.close();
@@ -101,16 +109,31 @@ void CSettingsHandler::InitSettings()
 	std::wstring settPath;
 
 	GetSettingsPath(settPath);
+	settPath.append(L"\\settings.bin");
 
-	std::ifstream is(settPath + L"\\settings.bin", std::ios::binary);
+	std::ifstream is(settPath, std::ios::binary);
 
 	if (is.is_open()) {
 		cereal::BinaryInputArchive iarchive(is);
 		SettingsData settData;
 
-		iarchive(settData);
-		userID = settData.login;
-		pass = settData.pass;
+		try {
+			iarchive(settData);
+		}
+		catch (...) {
+			is.close();
+			DeleteFile(settPath.c_str());
+			return;
+		}
+
+		std::vector<BYTE> v(base64_decode(settData.login));
+		s2ws(std::string(v.begin(), v.end()), userID);
+
+		v = base64_decode(settData.pass);
+		s2ws(std::string(v.begin(), v.end()), pass);
+		
+		v = base64_decode(settData.syncPath);
+		s2ws(std::string(v.begin(), v.end()), syncPath);
 
 		is.close();
 	}
