@@ -18,3 +18,5 @@ bool SelectPathDialog(std::wstring& path);
 int ScaleDPI(int x);
 
 RECT GetCtrlLocalCoordinates(HWND hWnd);
+
+void AppendText(const HWND &hwndOutput, const std::wstring& newText);

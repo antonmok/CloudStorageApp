@@ -171,3 +171,20 @@ RECT GetCtrlLocalCoordinates(HWND hWnd)
 	MapWindowPoints(HWND_DESKTOP, GetParent(hWnd), (LPPOINT)&Rect, 2);
 	return Rect;
 }
+
+void AppendText(const HWND &hwndOutput, const std::wstring& newText)
+{
+	// get the current selection
+	DWORD StartPos, EndPos;
+	SendMessage(hwndOutput, EM_GETSEL, reinterpret_cast<WPARAM>(&StartPos), reinterpret_cast<WPARAM>(&EndPos));
+
+	// move the caret to the end of the text
+	int outLength = GetWindowTextLength(hwndOutput);
+	SendMessage(hwndOutput, EM_SETSEL, outLength, outLength);
+
+	// insert the text at the new caret position
+	SendMessage(hwndOutput, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(newText.c_str()));
+
+	// restore the previous selection
+	SendMessage(hwndOutput, EM_SETSEL, StartPos, EndPos);
+}
