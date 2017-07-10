@@ -18,4 +18,7 @@
 #include <tchar.h>
 
 
-// TODO: reference additional headers your program requires here
+#define UM_CHECK_LOGIN		WM_APP + 1
+#define UM_LOGIN_COMPLETE	WM_APP + 2
+#define UM_UPLOAD_FILES		WM_APP + 3
+#define UM_FILES_CHANGED	WM_APP + 4

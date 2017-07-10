@@ -2,7 +2,6 @@
 #include "Helpers.h"
 #include <iostream>
 #include <string>
-#include <Shobjidl.h>
 
 void s2ws(const std::string& str, std::wstring& outStr)
 {
@@ -111,49 +110,6 @@ std::vector<BYTE> base64_decode(std::string const& encoded_string) {
 	return ret;
 }
 
-bool SelectPathDialog(std::wstring& path)
-{
-	IFileDialog *pfd;
-	WCHAR* pathBuf = NULL;
-	std::wstring szEXEDesc(L"Executable file");
-
-	/*COMDLG_FILTERSPEC rgSpec[] = {
-		{ szEXEDesc.c_str(), L"*.exe" },
-	};*/
-
-	HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
-
-	if (SUCCEEDED(hr)) {
-
-		/*if (!SUCCEEDED(pfd->SetFileTypes(1, rgSpec))) {
-			return false;
-		}*/
-
-		DWORD dwOptions;
-		if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
-		{
-			pfd->SetOptions(dwOptions | FOS_PICKFOLDERS);
-		}
-
-		if (SUCCEEDED(pfd->Show(NULL))) {
-			IShellItem *psi;
-			if (SUCCEEDED(pfd->GetResult(&psi))) {
-				if (SUCCEEDED(psi->GetDisplayName(SIGDN_DESKTOPABSOLUTEPARSING, &pathBuf))) {
-					path.assign(pathBuf);
-					CoTaskMemFree(pathBuf);
-
-					return true;
-				}
-				psi->Release();
-			}
-		}
-		pfd->Release();
-	}
-
-	return false;
-}
-
-
 int ScaleDPI(int x)
 {
 	HDC screen = GetDC(0);
@@ -172,7 +128,7 @@ RECT GetCtrlLocalCoordinates(HWND hWnd)
 	return Rect;
 }
 
-void AppendText(const HWND &hwndOutput, const std::wstring& newText)
+void EditAppendText(const HWND &hwndOutput, const std::wstring& newText)
 {
 	// get the current selection
 	DWORD StartPos, EndPos;
@@ -188,3 +144,28 @@ void AppendText(const HWND &hwndOutput, const std::wstring& newText)
 	// restore the previous selection
 	SendMessage(hwndOutput, EM_SETSEL, StartPos, EndPos);
 }
+
+/*void PrintTree(const TDirTree& t, TDirTree::iterator tIt)
+{
+	if (t.empty()) return;
+	if (t.number_of_children(tIt) == 0) {
+		OutputDebugStringA(tIt->name.c_str());
+	} else {
+		// parent
+		OutputDebugStringA(tIt->name.c_str());
+		OutputDebugStringA("(");
+		// child1, ..., child_n
+		int siblingCount = t.number_of_siblings(t.begin(tIt));
+		int siblingNum;
+		TDirTree::sibling_iterator iChildren;
+		for (iChildren = t.begin(tIt), siblingNum = 0; iChildren != t.end(tIt); ++iChildren, ++siblingNum) {
+			// recursively print child
+			PrintTree(t, iChildren);
+			// comma after every child except the last one
+			if (siblingNum != siblingCount) {
+				OutputDebugStringA(", ");
+			}
+		}
+		OutputDebugStringA(")\n");
+	}
+}*/

@@ -58,6 +58,7 @@ void HandleCredentials(HWND hDlg, WPARAM wParam, CLoginHandler& loginHandler)
 		if (loginHandler.LogIn(bufLogin, bufPass)) {
 			CSettingsHandler::Instance().SetCreds(bufLogin, bufPass);
 			CSettingsHandler::Instance().SaveSettings();
+			loginHandler.SetHaveAccount(true);
 			EndDialog(hDlg, LOWORD(wParam));
 		} else {
 			MessageBox(hDlg, L"Failed to log in", L"App", MB_ICONEXCLAMATION);

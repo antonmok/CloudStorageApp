@@ -1,5 +1,6 @@
 // MainDlg.cpp : Defines the entry point for the application.
 //
+#define NOMINMAX
 
 #include "stdafx.h"
 #include "resource.h"
@@ -12,6 +13,7 @@
 #include "LoginHandler.h"
 #include "Helpers.h"
 #include "NetHelper.h"
+#include "FolderStruct.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -20,10 +22,6 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #define MAX_LOADSTRING	100
 #define TIMER_ID		14
 
-#define UM_CHECK_LOGIN		WM_APP + 1
-#define UM_UPLOAD_FILES		WM_APP + 3
-#define UM_FILES_CHANGED	WM_APP + 4
-
 // Global Variables:
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
@@ -31,6 +29,7 @@ TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 
 CSettingsHandler& settingsHandler = CSettingsHandler::Instance();
 CLoginHandler& loginHandler = CLoginHandler::Instance();
+CDirectoryTree& dirTreeInstance = CDirectoryTree::Instance();
 
 int g_SelectedBrowser = -1;
 bool g_Watching = false;
@@ -87,9 +86,29 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 void InitGUIControls(HWND hDlg)
 {
+	InitCommonControls();
+
+	/*TODO: handle image list*/
+	HIMAGELIST hImageList = ImageList_LoadBitmap(hInst, MAKEINTRESOURCEW(IDB_PNG_DIR), 16, 0, NULL);
+	ImageList_Add(hImageList, LoadBitmap(hInst, MAKEINTRESOURCE(IDB_PNG_FILE)), NULL);
+	TreeView_SetImageList(GetDlgItem(hDlg, IDC_TREE), hImageList, TVSIL_NORMAL);
+
 	if (settingsHandler.GetSyncPath() != L"") {
 		SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + settingsHandler.GetSyncPath()).c_str());
 		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
+	}
+}
+
+void ShowRemoteTree(HWND hDlg)
+{
+	std::string fields("token=");
+	std::string response;
+
+	fields.append(loginHandler.GetToken());
+
+	if (PostHttps(std::string(BASE_URL) + METHOD_GET_TREE, fields, response)) {
+		dirTreeInstance.InitRemoteTree(response);
+		dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE_REMOTE), true);
 	}
 }
 
@@ -108,171 +127,135 @@ void SetMainWindowPos(HWND hWnd)
 	SetWindowPos(hWnd, NULL, width / 2 - wndWidth / 2, height / 2 - wndHeight / 2, 0, 0, SWP_NOSIZE);
 }
 
-/*bool WatchDirectory(const std::wstring& szDir, HWND hMainWnd)
+std::string GetNewObjectId(const std::string jsonStr)
 {
-	DWORD dwWaitStatus;
-	HANDLE dwChangeHandles;
-	TCHAR lpDrive[4];
-	TCHAR lpFile[_MAX_FNAME];
-	TCHAR lpExt[_MAX_EXT];
+	std::string idStr;
 
-	_tsplitpath_s(szDir.c_str(), lpDrive, 4, NULL, 0, lpFile, _MAX_FNAME, lpExt, _MAX_EXT);
-
-	lpDrive[2] = (TCHAR)'\\';
-	lpDrive[3] = (TCHAR)'\0';
-
-	// Watch the directory for file creation, deletion and write. 
-	dwChangeHandles = FindFirstChangeNotification(szDir.c_str(), FALSE, FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_SIZE);
-
-	if (dwChangeHandles == INVALID_HANDLE_VALUE || dwChangeHandles == NULL) {
-		OutputDebugString(L"ERROR: FindFirstChangeNotification function failed.\n");
-		return false;
+	// parse JSON
+	Document doc;
+	if (doc.Parse(jsonStr.c_str()).HasParseError()) {
+		return "";
 	}
 
-	while (TRUE) {
-		// Wait for notification.
-		dwWaitStatus = WaitForSingleObject(dwChangeHandles, INFINITE);
+	if (doc.HasMember(FIELD_SUCCESS) && doc[FIELD_SUCCESS].IsNumber()) {
+		if (doc["success"].GetInt() == 1) {
 
-		switch (dwWaitStatus) {
-			case WAIT_OBJECT_0:
-
-				// Handle event and restart the notification.
-				PostMessage(hMainWnd, UM_FILES_CHANGED, 0, 0);
-				if (FindNextChangeNotification(dwChangeHandles) == FALSE) {
-					OutputDebugString(L"ERROR: FindNextChangeNotification function failed.\n");
-					return false;
+			Value::ConstMemberIterator itrData = doc.FindMember(FIELD_DATA);
+			if (itrData != doc.MemberEnd()) {
+				
+				Value::ConstMemberIterator itrId = itrData->value.FindMember(FIELD_OBJ_ID);
+				if (itrId != itrData->value.MemberEnd()) {
+					idStr = itrId->value.GetString();
 				}
-				break;
-
-			default:
-				OutputDebugString(L"ERROR: Unhandled dwWaitStatus.\n");
-				return false;
-				break;
+			}
 		}
 	}
-}*/
 
-void WatchDirectory(const std::wstring& szDir, HWND hMainWnd)
-{
-	HANDLE hDir = CreateFile(
-		szDir.c_str(),                                // pointer to the file name
-		FILE_LIST_DIRECTORY,                // access (read/write) mode
-		// Share mode MUST be the following to avoid problems with renames via Explorer!
-		FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE, // share mode
-		NULL,                               // security descriptor
-		OPEN_EXISTING,                      // how to create
-		FILE_FLAG_BACKUP_SEMANTICS,         // file attributes
-		NULL                                // file with attributes to copy
-		);
-
-	if (hDir == INVALID_HANDLE_VALUE) {
-		OutputDebugString(L"ERROR: Can not open dir.\n");
-		return;
-	}
-
-	char szBuffer[1024 * 128];
-	DWORD BytesReturned;
-	while (ReadDirectoryChangesW(
-		hDir,                          // handle to directory
-		&szBuffer,                       // read results buffer
-		sizeof(szBuffer),                // length of buffer
-		TRUE,                          // monitoring option
-		FILE_NOTIFY_CHANGE_SECURITY |
-		FILE_NOTIFY_CHANGE_CREATION |
-		FILE_NOTIFY_CHANGE_LAST_WRITE |
-		FILE_NOTIFY_CHANGE_SIZE |
-		FILE_NOTIFY_CHANGE_ATTRIBUTES |
-		FILE_NOTIFY_CHANGE_DIR_NAME |
-		FILE_NOTIFY_CHANGE_FILE_NAME,  // filter conditions
-		&BytesReturned,                // bytes returned
-		NULL,                          // overlapped buffer
-		NULL                           // completion routine
-		)
-		) {
-		DWORD dwOffset = 0;
-		FILE_NOTIFY_INFORMATION* pInfo = NULL;
-
-		do {
-			// Get a pointer to the first change record...
-			pInfo = (FILE_NOTIFY_INFORMATION*)&szBuffer[dwOffset];
-
-			std::wstring action = L"*";
-			switch (pInfo->Action) {
-				case FILE_ACTION_ADDED: action = L"Added"; break;
-				case FILE_ACTION_REMOVED: action = L"Deleted"; break;
-				case FILE_ACTION_MODIFIED: action = L"Modified"; break;
-				case FILE_ACTION_RENAMED_OLD_NAME: action = L"Old name"; break;
-				case FILE_ACTION_RENAMED_NEW_NAME: action = L"New name"; break;
-			}
-
-			std::wstring szFileName(pInfo->FileName, pInfo->FileNameLength / 2);
-			
-			//OutputDebugString((action + L": " + szFileName + L"\n").c_str());
-			AppendText(GetDlgItem(hMainWnd, IDC_EDIT_TRACE), action + L": " + szFileName + L"\r\n");
-			//PostMessage(hMainWnd, UM_FILES_CHANGED, 0, 0);
-
-			// More than one change may happen at the same time. Load the next change and continue...
-			dwOffset += pInfo->NextEntryOffset;
-		} while (pInfo->NextEntryOffset != 0);
-	}
+	return idStr;
 }
 
-bool UploadFiles(HWND hDlg) {
+bool RemotelyExist(const std::string& name, const std::string& remotePath, std::string& pathId)
+{
+	bool found = false;
 
-	std::vector<std::string> files;
-	std::wstring path(settingsHandler.GetSyncPath());
-	std::string resData;
-	std::string resDataTotal;
+	THandleNodeCallback FindObject = [&found, &name, &remotePath, &pathId](TDirTree::iterator nodeIt)
+	{
+		SDirNode& node = *nodeIt;
 
-	WIN32_FIND_DATA ffd;
-	HANDLE hFind = INVALID_HANDLE_VALUE;
-	DWORD dwError = 0;
-	
-
-	path.append(L"\\*");
-	hFind = FindFirstFile(path.c_str(), &ffd);
-
-	if (INVALID_HANDLE_VALUE == hFind) {
-		MessageBox(hDlg, L"Upload directory access error", L"Error", MB_ICONEXCLAMATION);
-		return false;
-	}
-
-	// List all the files in the directory
-	do {
-		if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-			// sub dir
-		} else {
-			std::string fileName;
-
-			ws2s(settingsHandler.GetSyncPath() + L"\\" + ffd.cFileName, fileName);
-			files.push_back(fileName);
+		if (node.remotePath == remotePath && node.name == name) {
+			found = true;
+			// update remote path for local tree
+			pathId = node.pathId;
+			// stop iterating
+			return false;
 		}
-	} while (FindNextFile(hFind, &ffd) != 0);
 
-	dwError = GetLastError();
-	if (dwError != ERROR_NO_MORE_FILES) {
-		OutputDebugString(L"File access error");
-	}
+		return true;
+	};
 
-	FindClose(hFind);
+	dirTreeInstance.IterateTree(FindObject, true);
 
-	if (files.size()) {
+	return found;
+}
 
-		for (auto fileName : files) {
-			UploadFile(std::string(BASE_URL) + METHOD_UPLOAD, fileName, loginHandler.GetToken(), resData);
-			resDataTotal.append(resData + "\r\n");
-		}
+void UploadFiles(HWND hDlg) {
+
+	if (dirTreeInstance.LocalTreeIsSet()) {
+
+		THandleNodeCallback UploadObject = [hDlg](TDirTree::iterator nodeIt)
+		{
+			SDirNode& node = *nodeIt;
+			std::wstring wideLocalPath;
+			std::wstring traceStr;
+			std::string response;
+			std::string newObjId;
+			std::string remotePath;
+			bool creationRes = false;
+			static bool root = true;
+
+			s2ws(node.localPath, wideLocalPath);
+
+			// get remote path for object
+			if (!root) {
+				const SDirNode& parentNode = nodeIt.node->parent->data;
+
+				if (parentNode.remotePath == "") {
+					node.remotePath = "," + parentNode.pathId + ",";
+				} else {
+					node.remotePath = parentNode.remotePath + parentNode.pathId + ",";
+				}
+				
+				// check if it is not exist already remotely
+				if (RemotelyExist(node.name, node.remotePath, node.pathId)) {
+					// skip this node
+					return true;
+				}
+
+			} else {
+				root = false;
+				if (node.pathId.size()) {
+					//no need to create remote root
+					return true;
+				}
+			}
+
+			if (node.isFile) {
+				creationRes = CreateObject(std::string(BASE_URL) + METHOD_CREATE_FILE, node.localPath, node.remotePath, node.name, loginHandler.GetToken(), response);
+				traceStr = L"file";
+			} else {
+				std::string fields(std::string(PARAM_TOKEN) + "=" + loginHandler.GetToken() + "&" + PARAM_NAME + "=" + node.name + "&" + PARAM_PATH + " = " + node.remotePath);
+				creationRes = PostHttps(std::string(BASE_URL) + METHOD_CREATE_FOLDER, fields, response);
+				traceStr = L"folder";
+				
+				// TODO: remove this
+				ShowRemoteTree(hDlg);
+			}
+
+			if (creationRes) {
+				// extract new object id
+				newObjId = GetNewObjectId(response);
+				node.pathId = newObjId;
+
+				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (traceStr + L" created: " + wideLocalPath).c_str());
+			} else {
+				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"Failed to create " + traceStr + L": " + wideLocalPath).c_str());
+				return false;
+			}
+
+			return true;
+		};
+
+		dirTreeInstance.IterateTree(UploadObject, false);
 		
 	} else {
 		MessageBox(hDlg, L"Upload directory is empty", L"Error", MB_ICONEXCLAMATION);
-		return false;
+		return;
 	}
 
-	SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), ("Upload file responce:\r\n" + resDataTotal).c_str());
 	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), TRUE);
 	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), L"Upload Folder");
 
-	return true;
+	return;
 }
 
 // Message handler
@@ -295,14 +278,23 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 			// start new thread to listen for files changes
 			std::thread watchDirThread(WatchDirectory, settingsHandler.GetSyncPath(), hDlg);
 			watchDirThread.detach();
+
+			dirTreeInstance.InitLocalTree(settingsHandler.GetSyncPath());
+			dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE), false);
 		}
-		
+
 		return (INT_PTR)TRUE;
 
 	case UM_FILES_CHANGED:
+	{
 		//UploadFiles(hDlg);
-		OutputDebugString(L"files changed\n");
+		std::shared_ptr<std::wstring> action(reinterpret_cast<std::wstring*>(wParam));
+		std::shared_ptr<std::wstring> fileName(reinterpret_cast<std::wstring*>(lParam));
+
+		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), *action + L": " + *fileName + L"\r\n");
+
 		return (INT_PTR)TRUE;
+	}
 
 	case UM_UPLOAD_FILES:
 		UploadFiles(hDlg);
@@ -312,7 +304,7 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		if (!loginHandler.IsLoggedIn()) {
 			if (settingsHandler.HaveCredentials()) {
 				if (loginHandler.LogIn(settingsHandler.GetUserID(), settingsHandler.GetPass())) {
-					SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), ("Sign In responce:\r\n" + loginHandler.loginTrace + "\r\n").c_str());
+					PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
 				} else {
 					settingsHandler.SetCreds(L"", L"");
 					settingsHandler.SaveSettings();
@@ -327,8 +319,15 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		return (INT_PTR)TRUE;
 
 	case UM_LOGIN_COMPLETE:
-		SetWindowTextA(GetDlgItem(hDlg, IDC_EDIT_TRACE), ("Sign In responce:\r\n" + loginHandler.loginTrace + "\r\n").c_str());
+	{
+		std::wstring wideStr;
+		s2ws(loginHandler.loginTrace, wideStr);
+		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"Sign In responce:\r\n" + wideStr + L"\r\n");
+
+		ShowRemoteTree(hDlg);
+
 		return (INT_PTR)TRUE;
+	}
 
 	case WM_ACTIVATE:
 		if (wParam != WA_INACTIVE) {
@@ -356,11 +355,15 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
 		case IDC_BUTTON_UPFOLDER:
 			
-			SelectPathDialog(path);
-			settingsHandler.SetSyncPath(path);
-			settingsHandler.SaveSettings();
-			SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + path).c_str());
-			EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
+			if (SelectPathDialog(path)) {
+				TreeView_DeleteAllItems(GetDlgItem(hDlg, IDC_TREE));
+				settingsHandler.SetSyncPath(path);
+				settingsHandler.SaveSettings();
+				SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + path).c_str());
+				EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
+				dirTreeInstance.InitLocalTree(settingsHandler.GetSyncPath());
+				dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE), false);
+			}
 
 			return (INT_PTR)TRUE;
 

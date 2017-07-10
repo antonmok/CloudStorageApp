@@ -3,8 +3,6 @@
 #include "resource.h"
 #include <string>
 
-#define UM_LOGIN_COMPLETE	WM_APP + 2
-
 INT_PTR CALLBACK LoginDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 
 class CLoginHandler {

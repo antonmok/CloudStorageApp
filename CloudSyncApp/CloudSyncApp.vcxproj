@@ -58,7 +58,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)\curl;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libcurl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libcurl.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -78,14 +78,16 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(SolutionDir)\curl;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libcurl.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libcurl.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="DlgControllers\LoginHandler.h" />
     <ClInclude Include="DlgControllers\MainDlg.h" />
     <ClInclude Include="DlgControllers\SettingsHandler.h" />
+    <ClInclude Include="Include\FolderStruct.h" />
     <ClInclude Include="Include\Helpers.h" />
+    <ClInclude Include="Include\JSONFields.h" />
     <ClInclude Include="Include\NetHelper.h" />
     <ClInclude Include="Include\stdafx.h" />
     <ClInclude Include="Include\targetver.h" />
@@ -95,6 +97,7 @@
     <ClCompile Include="DlgControllers\LoginHandler.cpp" />
     <ClCompile Include="DlgControllers\MainDlg.cpp" />
     <ClCompile Include="DlgControllers\SettingsHandler.cpp" />
+    <ClCompile Include="Source\FolderStruct.cpp" />
     <ClCompile Include="Source\Helpers.cpp" />
     <ClCompile Include="Source\NetHelper.cpp" />
     <ClCompile Include="Source\stdafx.cpp" />
@@ -104,6 +107,8 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="app.ico" />
+    <Image Include="file_16xLG.png" />
+    <Image Include="folder_Closed_16xLG.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

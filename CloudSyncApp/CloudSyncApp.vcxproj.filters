@@ -51,6 +51,12 @@
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Include\FolderStruct.h">
+      <Filter>Header Files\Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\JSONFields.h">
+      <Filter>Header Files\Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DlgControllers\LoginHandler.cpp">
@@ -71,6 +77,9 @@
     <ClCompile Include="Source\stdafx.cpp">
       <Filter>Source Files\Source</Filter>
     </ClCompile>
+    <ClCompile Include="Source\FolderStruct.cpp">
+      <Filter>Source Files\Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="CloudSyncApp.rc">
@@ -79,6 +88,12 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="app.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="folder_Closed_16xLG.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="file_16xLG.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

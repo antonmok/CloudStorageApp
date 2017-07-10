@@ -13,10 +13,6 @@ void ws2s(const std::wstring& wstr, std::string& outStr);
 std::string base64_encode(BYTE const* buf, unsigned int bufLen);
 std::vector<BYTE> base64_decode(std::string const&);
 
-bool SelectPathDialog(std::wstring& path);
-
 int ScaleDPI(int x);
-
 RECT GetCtrlLocalCoordinates(HWND hWnd);
-
-void AppendText(const HWND &hwndOutput, const std::wstring& newText);
+void EditAppendText(const HWND &hwndOutput, const std::wstring& newText);

@@ -93,7 +93,7 @@ bool PostHttps(const std::string& url, const std::string& postFields, std::strin
 	return res == CURLE_OK;
 }
 
-bool UploadFile(const std::string& url, const std::string& filename, const std::string& token, std::string& resData)
+bool CreateObject(const std::string& url, const std::string& localPath, const std::string& path, const std::string& name, const std::string& token, std::string& resData)
 {
 	CURL *curl_handle;
 	CURLcode res;
@@ -114,11 +114,23 @@ bool UploadFile(const std::string& url, const std::string& filename, const std::
 		CURLFORM_COPYCONTENTS, token.c_str(),
 		CURLFORM_END);
 
+	curl_formadd(&formpost,
+		&lastptr,
+		CURLFORM_COPYNAME, "name",
+		CURLFORM_COPYCONTENTS, name.c_str(),
+		CURLFORM_END);
+
+	curl_formadd(&formpost,
+		&lastptr,
+		CURLFORM_COPYNAME, "path",
+		CURLFORM_COPYCONTENTS, path.c_str(),
+		CURLFORM_END);
+
 	// Add file to form
 	curl_formadd(&formpost,
 		&lastptr,
 		CURLFORM_COPYNAME, "object_file",
-		CURLFORM_FILE, filename.c_str(),
+		CURLFORM_FILE, (localPath + "\\" + name).c_str(),
 		CURLFORM_END);
 
 	curl_handle = curl_easy_init();
