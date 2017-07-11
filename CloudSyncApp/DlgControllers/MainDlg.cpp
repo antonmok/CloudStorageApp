@@ -112,6 +112,12 @@ void ShowRemoteTree(HWND hDlg)
 	}
 }
 
+void ShowLocalTree(HWND hDlg)
+{
+	dirTreeInstance.InitLocalTree(settingsHandler.GetSyncPath());
+	dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE), false);
+}
+
 void SetMainWindowPos(HWND hWnd)
 {
 	RECT wndRect;
@@ -182,18 +188,21 @@ void UploadFiles(HWND hDlg) {
 
 	if (dirTreeInstance.LocalTreeIsSet()) {
 
-		THandleNodeCallback UploadObject = [hDlg](TDirTree::iterator nodeIt)
+		bool root = true;
+
+		THandleNodeCallback UploadObject = [hDlg, &root](TDirTree::iterator nodeIt)
 		{
 			SDirNode& node = *nodeIt;
 			std::wstring wideLocalPath;
+			std::wstring wideName;
 			std::wstring traceStr;
 			std::string response;
 			std::string newObjId;
 			std::string remotePath;
 			bool creationRes = false;
-			static bool root = true;
 
 			s2ws(node.localPath, wideLocalPath);
+			s2ws(node.name, wideName);
 
 			// get remote path for object
 			if (!root) {
@@ -208,6 +217,7 @@ void UploadFiles(HWND hDlg) {
 				// check if it is not exist already remotely
 				if (RemotelyExist(node.name, node.remotePath, node.pathId)) {
 					// skip this node
+					EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\nObject already exist on server: " + wideLocalPath + L"\\" + wideName).c_str());
 					return true;
 				}
 
@@ -223,12 +233,9 @@ void UploadFiles(HWND hDlg) {
 				creationRes = CreateObject(std::string(BASE_URL) + METHOD_CREATE_FILE, node.localPath, node.remotePath, node.name, loginHandler.GetToken(), response);
 				traceStr = L"file";
 			} else {
-				std::string fields(std::string(PARAM_TOKEN) + "=" + loginHandler.GetToken() + "&" + PARAM_NAME + "=" + node.name + "&" + PARAM_PATH + " = " + node.remotePath);
+				std::string fields(std::string(PARAM_TOKEN) + "=" + loginHandler.GetToken() + "&" + PARAM_NAME + "=" + node.name + "&" + PARAM_PATH + "=" + node.remotePath);
 				creationRes = PostHttps(std::string(BASE_URL) + METHOD_CREATE_FOLDER, fields, response);
 				traceStr = L"folder";
-				
-				// TODO: remove this
-				ShowRemoteTree(hDlg);
 			}
 
 			if (creationRes) {
@@ -236,9 +243,9 @@ void UploadFiles(HWND hDlg) {
 				newObjId = GetNewObjectId(response);
 				node.pathId = newObjId;
 
-				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (traceStr + L" created: " + wideLocalPath).c_str());
+				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\n" + traceStr + L" created: " + wideLocalPath + L"\\" + wideName).c_str());
 			} else {
-				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"Failed to create " + traceStr + L": " + wideLocalPath).c_str());
+				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\nFailed to create " + traceStr + L": " + wideLocalPath + L"\\" + wideName).c_str());
 				return false;
 			}
 
@@ -246,6 +253,8 @@ void UploadFiles(HWND hDlg) {
 		};
 
 		dirTreeInstance.IterateTree(UploadObject, false);
+		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"\r\n");
+		ShowRemoteTree(hDlg);
 		
 	} else {
 		MessageBox(hDlg, L"Upload directory is empty", L"Error", MB_ICONEXCLAMATION);
@@ -278,20 +287,22 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 			// start new thread to listen for files changes
 			std::thread watchDirThread(WatchDirectory, settingsHandler.GetSyncPath(), hDlg);
 			watchDirThread.detach();
-
-			dirTreeInstance.InitLocalTree(settingsHandler.GetSyncPath());
-			dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE), false);
+			ShowLocalTree(hDlg);
 		}
 
 		return (INT_PTR)TRUE;
 
 	case UM_FILES_CHANGED:
 	{
-		//UploadFiles(hDlg);
 		std::shared_ptr<std::wstring> action(reinterpret_cast<std::wstring*>(wParam));
 		std::shared_ptr<std::wstring> fileName(reinterpret_cast<std::wstring*>(lParam));
 
 		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), *action + L": " + *fileName + L"\r\n");
+		
+		if (!IsFilteredAction(*action, *fileName)) {
+			//UploadFiles(hDlg);
+			ShowLocalTree(hDlg);
+		}
 
 		return (INT_PTR)TRUE;
 	}
@@ -356,13 +367,13 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		case IDC_BUTTON_UPFOLDER:
 			
 			if (SelectPathDialog(path)) {
-				TreeView_DeleteAllItems(GetDlgItem(hDlg, IDC_TREE));
 				settingsHandler.SetSyncPath(path);
 				settingsHandler.SaveSettings();
+
 				SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + path).c_str());
 				EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
-				dirTreeInstance.InitLocalTree(settingsHandler.GetSyncPath());
-				dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE), false);
+				
+				ShowLocalTree(hDlg);
 			}
 
 			return (INT_PTR)TRUE;

@@ -7,6 +7,8 @@
 #include <vector>
 typedef unsigned char BYTE;
 
+bool IsFilteredAction(const std::wstring& action, const std::wstring& name);
+
 void s2ws(const std::string& str, std::wstring& outStr);
 void ws2s(const std::wstring& wstr, std::string& outStr);
 

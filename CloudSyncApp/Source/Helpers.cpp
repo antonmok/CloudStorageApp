@@ -3,6 +3,18 @@
 #include <iostream>
 #include <string>
 
+bool IsFilteredAction(const std::wstring& action, const std::wstring& name)
+{
+	if (action == L"Old name") {
+		return true;
+	} else if (action == L"Modified") {
+		// TODO: check dir\file 
+		return true;
+	}
+
+	return false;
+}
+
 void s2ws(const std::string& str, std::wstring& outStr)
 {
 	using convert_typeX = std::codecvt_utf8<wchar_t>;

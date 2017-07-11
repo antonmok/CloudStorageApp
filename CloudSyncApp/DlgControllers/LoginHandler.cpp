@@ -58,7 +58,6 @@ void HandleCredentials(HWND hDlg, WPARAM wParam, CLoginHandler& loginHandler)
 		if (loginHandler.LogIn(bufLogin, bufPass)) {
 			CSettingsHandler::Instance().SetCreds(bufLogin, bufPass);
 			CSettingsHandler::Instance().SaveSettings();
-			loginHandler.SetHaveAccount(true);
 			EndDialog(hDlg, LOWORD(wParam));
 		} else {
 			MessageBox(hDlg, L"Failed to log in", L"App", MB_ICONEXCLAMATION);
@@ -69,6 +68,7 @@ void HandleCredentials(HWND hDlg, WPARAM wParam, CLoginHandler& loginHandler)
 
 		if (loginHandler.SignUp(bufLogin, bufPass, bufFName, bufLName)) {
 			SwitchGUIStateToSignin(hDlg);
+			loginHandler.SetHaveAccount(true);
 			MessageBox(hDlg, L"You have been registered. Now you can sign in", L"App", MB_OK);
 			SetWindowText(GetDlgItem(hDlg, IDC_EDIT_LOGIN), L"");
 			SetWindowText(GetDlgItem(hDlg, IDC_EDIT_PASS), L"");
