@@ -13,7 +13,7 @@ bool IsINode(const std::wstring fileName)
 
 bool CDirectoryTree::LocalTreeIsSet()
 {
-	if (localTree.number_of_children(localTree.begin())) {
+	if (localTree.number_of_siblings(localTree.head)) {
 		return true;
 	}
 
@@ -22,7 +22,7 @@ bool CDirectoryTree::LocalTreeIsSet()
 
 bool CDirectoryTree::RemoteTreeIsSet()
 {
-	if (remoteTree.number_of_children(remoteTree.begin())) {
+	if (remoteTree.number_of_siblings(remoteTree.head)) {
 		return true;
 	}
 

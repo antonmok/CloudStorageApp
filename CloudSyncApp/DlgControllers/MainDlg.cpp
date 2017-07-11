@@ -258,7 +258,6 @@ void UploadFiles(HWND hDlg) {
 		
 	} else {
 		MessageBox(hDlg, L"Upload directory is empty", L"Error", MB_ICONEXCLAMATION);
-		return;
 	}
 
 	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), TRUE);
