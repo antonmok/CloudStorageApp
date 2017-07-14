@@ -11,6 +11,7 @@
 #include "MainDlg.h"
 #include "SettingsHandler.h"
 #include "LoginHandler.h"
+#include "UpdatesHandler.h"
 #include "Helpers.h"
 #include "NetHelper.h"
 #include "FolderStruct.h"
@@ -30,6 +31,7 @@ TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 CSettingsHandler& settingsHandler = CSettingsHandler::Instance();
 CLoginHandler& loginHandler = CLoginHandler::Instance();
 CDirectoryTree& dirTreeInstance = CDirectoryTree::Instance();
+CUpdateHandler& updateHandler = CUpdateHandler::Instance();
 
 int g_SelectedBrowser = -1;
 bool g_Watching = false;
@@ -336,8 +338,16 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 
 		ShowRemoteTree(hDlg);
 
+		// start new thread to check updates
+		std::thread checkUpdatesThread(&CUpdateHandler::CheckUpdates, std::ref(updateHandler), hDlg);
+		checkUpdatesThread.detach();
+
 		return (INT_PTR)TRUE;
 	}
+
+	case UM_HAVE_UPDATES:
+		DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_UPDATE), hDlg, UpdateDlgProc);
+		return (INT_PTR)TRUE;
 
 	case WM_ACTIVATE:
 		if (wParam != WA_INACTIVE) {

@@ -57,6 +57,9 @@
     <ClInclude Include="Include\JSONFields.h">
       <Filter>Header Files\Include</Filter>
     </ClInclude>
+    <ClInclude Include="DlgControllers\UpdatesHandler.h">
+      <Filter>Header Files\DlgControllers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DlgControllers\LoginHandler.cpp">
@@ -79,6 +82,9 @@
     </ClCompile>
     <ClCompile Include="Source\FolderStruct.cpp">
       <Filter>Source Files\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="DlgControllers\UpdatesHandler.cpp">
+      <Filter>Source Files\DlgControllers</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

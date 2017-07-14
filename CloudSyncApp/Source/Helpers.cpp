@@ -2,6 +2,26 @@
 #include "Helpers.h"
 #include <iostream>
 #include <string>
+#include <sstream>
+#include <iterator>
+
+template<typename Out>
+void split(const std::string &s, char delim, Out result)
+{
+	std::stringstream ss;
+	ss.str(s);
+	std::string item;
+	while (std::getline(ss, item, delim)) {
+		*(result++) = item;
+	}
+}
+
+std::vector<std::string> split(const std::string &s, char delim)
+{
+	std::vector<std::string> elems;
+	split(s, delim, std::back_inserter(elems));
+	return elems;
+}
 
 bool IsFilteredAction(const std::wstring& action, const std::wstring& name)
 {
@@ -155,6 +175,30 @@ void EditAppendText(const HWND &hwndOutput, const std::wstring& newText)
 
 	// restore the previous selection
 	SendMessage(hwndOutput, EM_SETSEL, StartPos, EndPos);
+}
+
+bool RunProcess(std::wstring path, std::wstring cmd)
+{
+	bool execRes = false;
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+
+	ZeroMemory(&si, sizeof(si));
+	si.cb = sizeof(si);
+	ZeroMemory(&pi, sizeof(pi));
+
+	if (path.size() > 0) {
+		if (CreateProcess(path.c_str(), (wchar_t*)cmd.c_str(), NULL, NULL, false, 0, NULL, NULL, &si, &pi)) {
+			// Close process and thread handles. 
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+			return true;
+		} else {
+			int err = GetLastError();
+		}
+	}
+
+	return false;
 }
 
 /*void PrintTree(const TDirTree& t, TDirTree::iterator tIt)

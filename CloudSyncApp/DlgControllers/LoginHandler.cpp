@@ -83,8 +83,6 @@ void HandleCredentials(HWND hDlg, WPARAM wParam, CLoginHandler& loginHandler)
 // Message handler
 INT_PTR CALLBACK LoginDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	UNREFERENCED_PARAMETER(lParam);
-
 	CLoginHandler& loginHandler = CLoginHandler::Instance();
 
 	switch (message)
@@ -188,17 +186,14 @@ bool CLoginHandler::LogIn(const std::wstring& userID, const std::wstring& pass)
 				if (itrData != doc.MemberEnd()) {
 
 					rapidjson::Value::ConstMemberIterator itr = itrData->value.FindMember(FIELD_TOKEN);
-					if (itrData != itrData->value.MemberEnd()) {
+					if (itr != itrData->value.MemberEnd()) {
 						if (itr->value.IsString()) {
 							loggedIn = true;
 							token.assign(itr->value.GetString());
-							
-
-							/**/
-							loginTrace = postResData;
 							PostMessage(hParent, UM_LOGIN_COMPLETE, 0, 0);
 							/**/
-
+							loginTrace = postResData;
+							/**/
 							return true;
 						}
 					}

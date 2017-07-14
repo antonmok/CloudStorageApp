@@ -1,14 +1,104 @@
-#include "stdafx.h"
+
 #include "NetHelper.h"
 #include <string>
 #include "curl/curl.h"
 
 #pragma comment(lib, "libcurl.lib")
 
+#define HTTP_HEADER_NAME_CONTENT_LENGTH	"Content-Length: "
+
 struct MemoryStruct {
 	char *memory;
 	size_t size;
 };
+
+struct FileDlStruct {
+	FILE* fp;
+	HWND hMainWnd;
+	UINT downloaded;
+};
+
+size_t FileSizeCallback(char *buffer, size_t size, size_t nitems, void *userp)
+{
+	std::string buff(buffer);
+
+	if (*((UINT*) userp) == 0 && buff.find(HTTP_HEADER_NAME_CONTENT_LENGTH) != std::string::npos) {
+
+		std::string contentLen = buff.substr(std::string(HTTP_HEADER_NAME_CONTENT_LENGTH).size());
+
+		*((int*) userp) = std::stoi(contentLen);
+	}
+
+	return nitems * size;
+}
+
+UINT GetFileSizeHTTP(const std::string& url)
+{
+	CURL *curl;
+	CURLcode res;
+	UINT fSize = 0;
+
+	curl = curl_easy_init();
+	if (curl) {
+		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		/* get us the resource without a body! */
+		curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+		curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, FileSizeCallback);
+		curl_easy_setopt(curl, CURLOPT_HEADERDATA, &fSize);
+		curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 OPR/45.0.2552.888");
+
+		res = curl_easy_perform(curl);
+
+		curl_easy_cleanup(curl);
+
+		return fSize;
+	}
+
+	return 0;
+}
+
+size_t WriteFileCallback(void* ptr, size_t size, size_t nmemb, void* userp)
+{
+	struct FileDlStruct* fileDlData = (struct FileDlStruct*)userp;
+
+	size_t written = fwrite(ptr, size, nmemb, fileDlData->fp);
+	fileDlData->downloaded += written;
+	PostMessage(fileDlData->hMainWnd, UM_SET_PROGRESS, fileDlData->downloaded, 0);
+
+	return written;
+}
+
+bool GetFileHTTP(const std::string& url, const std::wstring& outPath, HWND hMainWnd)
+{
+	CURL *curl;
+	CURLcode res;
+	struct FileDlStruct fileDlData;
+	
+	fileDlData.hMainWnd = hMainWnd;
+	fileDlData.downloaded = 0;
+
+	curl = curl_easy_init();
+
+	if (curl) {
+		errno_t err = _wfopen_s(&(fileDlData.fp), outPath.c_str(), L"wb");
+		curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteFileCallback);
+		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &fileDlData);
+		curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 OPR/45.0.2552.888");
+		
+		res = curl_easy_perform(curl);
+		
+		curl_easy_cleanup(curl);
+		fclose(fileDlData.fp);
+		
+		// wait for progress animation a while
+		Sleep(500);
+
+		return true;
+	}
+
+	return false;
+}
 
 static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {

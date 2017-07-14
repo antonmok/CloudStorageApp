@@ -1,5 +1,6 @@
 #pragma once
 
+#include "stdafx.h"
 #include <string>
 #include "JSONFields.h"
 
@@ -11,6 +12,7 @@
 #define METHOD_CREATE_FILE		"/createObject"
 #define METHOD_CREATE_FOLDER	"/createFolder"
 #define METHOD_GET_TREE			"/getObjectList"
+#define METHOD_VERSION			"/getVersion"
 
 #define PARAM_EMAIL			"email"
 #define PARAM_PASS			"password"
@@ -23,3 +25,6 @@
 
 bool PostHttps(const std::string& url, const std::string& postFields, std::string& resData);
 bool CreateObject(const std::string& url, const std::string& localPath, const std::string& path, const std::string& name, const std::string& token, std::string& resData);
+
+UINT GetFileSizeHTTP(const std::string& url);
+bool GetFileHTTP(const std::string& url, const std::wstring& outPath, HWND hProgressBar);

@@ -60,6 +60,9 @@
       <AdditionalLibraryDirectories>$(SolutionDir)\curl;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>libcurl.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -80,11 +83,15 @@
       <AdditionalLibraryDirectories>$(SolutionDir)\curl;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>libcurl.lib;comctl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <Manifest>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
+    </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="DlgControllers\LoginHandler.h" />
     <ClInclude Include="DlgControllers\MainDlg.h" />
     <ClInclude Include="DlgControllers\SettingsHandler.h" />
+    <ClInclude Include="DlgControllers\UpdatesHandler.h" />
     <ClInclude Include="Include\FolderStruct.h" />
     <ClInclude Include="Include\Helpers.h" />
     <ClInclude Include="Include\JSONFields.h" />
@@ -97,6 +104,7 @@
     <ClCompile Include="DlgControllers\LoginHandler.cpp" />
     <ClCompile Include="DlgControllers\MainDlg.cpp" />
     <ClCompile Include="DlgControllers\SettingsHandler.cpp" />
+    <ClCompile Include="DlgControllers\UpdatesHandler.cpp" />
     <ClCompile Include="Source\FolderStruct.cpp" />
     <ClCompile Include="Source\Helpers.cpp" />
     <ClCompile Include="Source\NetHelper.cpp" />
