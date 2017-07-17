@@ -4,7 +4,8 @@
 #include <string>
 #include "JSONFields.h"
 
-#define BASE_URL		"http://13.59.116.57:3000/api"
+//#define BASE_URL		"http://13.59.116.57:3000/api"
+#define BASE_URL		"http://13.58.207.110/api"
 
 #define METHOD_LOGIN			"/login"
 #define METHOD_LOGOUT			"/logout"
