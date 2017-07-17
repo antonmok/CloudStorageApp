@@ -3,7 +3,7 @@
 #include "stdafx.h"
 #include <string>
 
-#define APP_VERSION	"1.0.1"
+#define APP_VERSION	"1.0.2"
 #define TEMP_INSTALLER_NAME L"CloudSyncAppInstaller.exe"
 
 INT_PTR CALLBACK UpdateDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
