@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "UpdatesHandler.h"
+#include "i18n.h"
 #include "NetHelper.h"
 #include "Helpers.h"
 #include <thread>
@@ -31,10 +32,15 @@ bool CUpdateHandler::VersionCmp(const std::string& versionFromServer)
 
 void CUpdateHandler::InitGUI(HWND hDlg)
 {
+	Ci18n& i18nHelper = Ci18n::Instance();
+	
+	SetWindowText(GetDlgItem(hDlg, IDC_STATIC_NEW_VER), i18nHelper.Geti18nItem("update_guide_lb").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDOK), i18nHelper.Geti18nItem("download_btn").c_str());
+
 	if (ForceFlag()) {
-		SetWindowText(GetDlgItem(hDlg, IDCANCEL), L"Exit");
+		SetWindowText(GetDlgItem(hDlg, IDCANCEL), i18nHelper.Geti18nItem("exit_btn").c_str());
 	} else {
-		SetWindowText(GetDlgItem(hDlg, IDCANCEL), L"Skip");
+		SetWindowText(GetDlgItem(hDlg, IDCANCEL), i18nHelper.Geti18nItem("skip_btn").c_str());
 	}
 }
 
@@ -94,7 +100,7 @@ void CUpdateHandler::PerformUpdate(HWND hMainWnd)
 
 	if (GetFileHTTP(installerURL, szTmpPath, hMainWnd)) {
 
-		if (RunProcess(szTmpPath, std::wstring(TEMP_INSTALLER_NAME) + L" -update")) {
+		if (ExecInstaller(szTmpPath, L" -update")) {
 			// stop itself
 			PostMessage(hMainWnd, WM_QUIT, 0, 0);
 		} else {
@@ -117,7 +123,7 @@ void CUpdateHandler::CheckUpdates(HWND hMainWnd)
 	std::string fields;
 	std::string version;
 
-	if (PostHttps(std::string(BASE_URL) + METHOD_VERSION, fields, responce)) {
+	if (PostHttp(std::string(BASE_URL) + METHOD_VERSION, fields, responce)) {
 		// parse JSON
 		rapidjson::Document doc;
 		if (doc.Parse(responce.c_str()).HasParseError()) {

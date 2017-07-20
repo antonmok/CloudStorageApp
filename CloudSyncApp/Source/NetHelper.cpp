@@ -119,7 +119,7 @@ static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, voi
 	return realsize;
 }
 
-bool PostHttps(const std::string& url, const std::string& postFields, std::string& resData)
+bool PostHttp(const std::string& url, const std::string& postFields, std::string& resData)
 {
 	CURL *curl_handle;
 	CURLcode res;

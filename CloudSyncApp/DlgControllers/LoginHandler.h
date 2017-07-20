@@ -29,7 +29,6 @@ public:
 
 	/*******/
 	std::string loginTrace;
-	HWND hParent;
 	/*******/
 
 private:

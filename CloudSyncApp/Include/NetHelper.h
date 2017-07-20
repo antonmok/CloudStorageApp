@@ -14,6 +14,7 @@
 #define METHOD_CREATE_FOLDER	"/createFolder"
 #define METHOD_GET_TREE			"/getObjectList"
 #define METHOD_VERSION			"/getVersion"
+#define METHOD_I18N				"/getTranslations"
 
 #define PARAM_EMAIL			"email"
 #define PARAM_PASS			"password"
@@ -22,9 +23,11 @@
 #define PARAM_TOKEN			"token"
 #define PARAM_NAME			"name"
 #define PARAM_PATH			"path"
+#define PARAM_TYPE			"type"
 
+#define TRANSLATION_TYPE	"windowApp"
 
-bool PostHttps(const std::string& url, const std::string& postFields, std::string& resData);
+bool PostHttp(const std::string& url, const std::string& postFields, std::string& resData);
 bool CreateObject(const std::string& url, const std::string& localPath, const std::string& path, const std::string& name, const std::string& token, std::string& resData);
 
 UINT GetFileSizeHTTP(const std::string& url);

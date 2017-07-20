@@ -21,12 +21,13 @@ struct SettingsData
 	std::string login;
 	std::string pass;
 	std::string syncPath;
+	std::string langCode;
 
 	// This method lets cereal know which data members to serialize
 	template<class Archive>
 	void serialize(Archive & archive)
 	{
-		archive(login, pass, syncPath); // serialize things by passing them to the archive
+		archive(login, pass, syncPath, langCode); // serialize things by passing them to the archive
 	}
 };
 
@@ -91,14 +92,17 @@ void CSettingsHandler::SaveSettings()
 	std::string userIDNarrow;
 	std::string passNarrow;
 	std::string syncPathNarrow;
+	std::string langCodeNarrow;
 
 	ws2s(userID, userIDNarrow);
 	ws2s(pass, passNarrow);
 	ws2s(syncPath, syncPathNarrow);
+	ws2s(langCode, langCodeNarrow);
 
 	settData.login = base64_encode((const unsigned char*)userIDNarrow.c_str(), userIDNarrow.size());
 	settData.pass = base64_encode((const unsigned char*)passNarrow.c_str(), passNarrow.size());
 	settData.syncPath = base64_encode((const unsigned char*)syncPathNarrow.c_str(), syncPathNarrow.size());
+	settData.langCode = base64_encode((const unsigned char*)langCodeNarrow.c_str(), langCodeNarrow.size());
 
 	oarchive(settData);
 	os.close();
@@ -135,8 +139,21 @@ void CSettingsHandler::InitSettings()
 		v = base64_decode(settData.syncPath);
 		s2ws(std::string(v.begin(), v.end()), syncPath);
 
+		v = base64_decode(settData.langCode);
+		s2ws(std::string(v.begin(), v.end()), langCode);
+
 		is.close();
 	}
+}
+
+void CSettingsHandler::SetLangCode(const std::wstring& szLangCode)
+{
+	langCode = szLangCode;
+}
+
+const std::wstring& CSettingsHandler::GetLangCode()
+{
+	return langCode;
 }
 
 void CSettingsHandler::SetSyncPath(const std::wstring& szPath)

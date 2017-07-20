@@ -94,6 +94,7 @@
     <ClInclude Include="DlgControllers\UpdatesHandler.h" />
     <ClInclude Include="Include\FolderStruct.h" />
     <ClInclude Include="Include\Helpers.h" />
+    <ClInclude Include="Include\i18n.h" />
     <ClInclude Include="Include\JSONFields.h" />
     <ClInclude Include="Include\NetHelper.h" />
     <ClInclude Include="Include\stdafx.h" />
@@ -107,6 +108,7 @@
     <ClCompile Include="DlgControllers\UpdatesHandler.cpp" />
     <ClCompile Include="Source\FolderStruct.cpp" />
     <ClCompile Include="Source\Helpers.cpp" />
+    <ClCompile Include="Source\i18n.cpp" />
     <ClCompile Include="Source\NetHelper.cpp" />
     <ClCompile Include="Source\stdafx.cpp" />
   </ItemGroup>

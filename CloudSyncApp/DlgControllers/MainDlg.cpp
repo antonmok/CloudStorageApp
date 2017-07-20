@@ -12,6 +12,7 @@
 #include "SettingsHandler.h"
 #include "LoginHandler.h"
 #include "UpdatesHandler.h"
+#include "i18n.h"
 #include "Helpers.h"
 #include "NetHelper.h"
 #include "FolderStruct.h"
@@ -32,14 +33,14 @@ CSettingsHandler& settingsHandler = CSettingsHandler::Instance();
 CLoginHandler& loginHandler = CLoginHandler::Instance();
 CDirectoryTree& dirTreeInstance = CDirectoryTree::Instance();
 CUpdateHandler& updateHandler = CUpdateHandler::Instance();
+Ci18n& i18nHelper = Ci18n::Instance();
 
-int g_SelectedBrowser = -1;
-bool g_Watching = false;
 bool g_FilesChangedTriggered = false;
 
 // Forward declarations of functions included in this code module:
 BOOL				InitInstance(HINSTANCE, int);
 INT_PTR CALLBACK	MainDlgProc(HWND, UINT, WPARAM, LPARAM);
+void ShowLocalTree(HWND hDlg);
 
 int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -86,6 +87,16 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	return TRUE;
 }
 
+void GetTranslations()
+{
+	std::string fields(std::string(PARAM_TYPE) + "=" + TRANSLATION_TYPE);
+	std::string responce;
+
+	if (PostHttp(std::string(BASE_URL) + METHOD_I18N, fields, responce)) {
+		i18nHelper.Seti18nDataFromJSON(responce);
+	}
+}
+
 void InitGUIControls(HWND hDlg)
 {
 	InitCommonControls();
@@ -96,9 +107,23 @@ void InitGUIControls(HWND hDlg)
 	TreeView_SetImageList(GetDlgItem(hDlg, IDC_TREE), hImageList, TVSIL_NORMAL);
 
 	if (settingsHandler.GetSyncPath() != L"") {
-		SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + settingsHandler.GetSyncPath()).c_str());
+		SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (i18nHelper.Geti18nItem("folder_lb") + L"\n" + settingsHandler.GetSyncPath()).c_str());
 		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
+
+		// start new thread to listen for files changes
+		std::thread watchDirThread(WatchDirectory, settingsHandler.GetSyncPath(), hDlg);
+		watchDirThread.detach();
+		ShowLocalTree(hDlg);
 	}
+
+	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPFOLDER), i18nHelper.Geti18nItem("set_folder_btn").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), i18nHelper.Geti18nItem("upload_btn").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_LOGOUT), i18nHelper.Geti18nItem("log_out_btn").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDCANCEL), i18nHelper.Geti18nItem("exit_btn").c_str());
+	SetWindowText(hDlg, i18nHelper.Geti18nItem("main_title").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_STATIC_LOCAL), i18nHelper.Geti18nItem("local_lb").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_STATIC_REMOTE), i18nHelper.Geti18nItem("remote_lb").c_str());
+
 }
 
 void ShowRemoteTree(HWND hDlg)
@@ -108,7 +133,7 @@ void ShowRemoteTree(HWND hDlg)
 
 	fields.append(loginHandler.GetToken());
 
-	if (PostHttps(std::string(BASE_URL) + METHOD_GET_TREE, fields, response)) {
+	if (PostHttp(std::string(BASE_URL) + METHOD_GET_TREE, fields, response)) {
 		dirTreeInstance.InitRemoteTree(response);
 		dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE_REMOTE), true);
 	}
@@ -236,7 +261,7 @@ void UploadFiles(HWND hDlg) {
 				traceStr = L"file";
 			} else {
 				std::string fields(std::string(PARAM_TOKEN) + "=" + loginHandler.GetToken() + "&" + PARAM_NAME + "=" + node.name + "&" + PARAM_PATH + "=" + node.remotePath);
-				creationRes = PostHttps(std::string(BASE_URL) + METHOD_CREATE_FOLDER, fields, response);
+				creationRes = PostHttp(std::string(BASE_URL) + METHOD_CREATE_FOLDER, fields, response);
 				traceStr = L"folder";
 			}
 
@@ -263,7 +288,7 @@ void UploadFiles(HWND hDlg) {
 	}
 
 	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), TRUE);
-	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), L"Upload Folder");
+	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), i18nHelper.Geti18nItem("upload_btn").c_str());
 
 	return;
 }
@@ -281,15 +306,8 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 	case WM_INITDIALOG:
 
 		settingsHandler.InitSettings();
-		InitGUIControls(hDlg);
+		GetTranslations();
 		SetMainWindowPos(hDlg);
-
-		if (settingsHandler.GetSyncPath() != L"") {
-			// start new thread to listen for files changes
-			std::thread watchDirThread(WatchDirectory, settingsHandler.GetSyncPath(), hDlg);
-			watchDirThread.detach();
-			ShowLocalTree(hDlg);
-		}
 
 		return (INT_PTR)TRUE;
 
@@ -320,11 +338,15 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 				} else {
 					settingsHandler.SetCreds(L"", L"");
 					settingsHandler.SaveSettings();
-					DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc);
+					if (DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc)) {
+						PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
+					}
 				}
 				
 			} else {
-				DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc);
+				if (DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc)) {
+					PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
+				}
 			}
 		}
 		
@@ -337,6 +359,8 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"Sign In responce:\r\n" + wideStr + L"\r\n");
 
 		ShowRemoteTree(hDlg);
+
+		InitGUIControls(hDlg);
 
 		// start new thread to check updates
 		std::thread checkUpdatesThread(&CUpdateHandler::CheckUpdates, std::ref(updateHandler), hDlg);
@@ -379,7 +403,7 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 				settingsHandler.SetSyncPath(path);
 				settingsHandler.SaveSettings();
 
-				SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (L"Folder:\n" + path).c_str());
+				SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (i18nHelper.Geti18nItem("folder_lb") + L"\n" + path).c_str());
 				EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
 				
 				ShowLocalTree(hDlg);
@@ -390,7 +414,7 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		case IDC_BUTTON_UPLOAD:
 
 			EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), FALSE);
-			SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), L"Uploading...");
+			SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), i18nHelper.Geti18nItem("upload_btn_dis").c_str());
 			PostMessage(hDlg, UM_UPLOAD_FILES, NULL, NULL);
 
 			return (INT_PTR)TRUE;

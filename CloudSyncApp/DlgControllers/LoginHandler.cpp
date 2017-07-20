@@ -3,14 +3,56 @@
 #include <CommCtrl.h>
 #include "LoginHandler.h"
 #include "SettingsHandler.h"
+#include "i18n.h"
 #include "NetHelper.h"
 #include "Helpers.h"
 #include "resource.h"
 #include "cereal/external/rapidjson/document.h"
 #include "cereal/external/rapidjson/reader.h"
 
+void InitGuiElements(HWND hDlg)
+{
+	Ci18n& i18nHelper = Ci18n::Instance();
+
+	SetWindowText(GetDlgItem(hDlg, IDCANCEL), i18nHelper.Geti18nItem("exit_btn").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDOK), i18nHelper.Geti18nItem("sign_up_btn").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_STATIC_FNAME), i18nHelper.Geti18nItem("first_name_lb").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_STATIC_LNAME), i18nHelper.Geti18nItem("last_name_lb").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_STATIC_EMAIL), i18nHelper.Geti18nItem("email_lb").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_STATIC_PASS), i18nHelper.Geti18nItem("password_lb").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_STATIC_HAVEACCOUNT), i18nHelper.Geti18nItem("already_have_acc_lb").c_str());
+	SetWindowText(GetDlgItem(hDlg, IDC_SYSLINK_SIGNIN), (L"<a>" + i18nHelper.Geti18nItem("sign_in_link") + L"</a>").c_str());
+
+	// TODO split terms_check to terms_check and terms_link
+	if (i18nHelper.GetLangCode() == Ci18n::LC_SPANISH) {
+		SetWindowText(GetDlgItem(hDlg, IDC_CHECK_AGREE), i18nHelper.Geti18nItem("terms_check").substr(0, 24).c_str());
+		SetWindowText(GetDlgItem(hDlg, IDC_SYSLINK_TERMS), (L"<a>" + i18nHelper.Geti18nItem("terms_check").substr(25, 15) + L"</a>").c_str());
+
+		RECT rc;
+		rc = GetCtrlLocalCoordinates(GetDlgItem(hDlg, IDC_CHECK_AGREE));
+		SetWindowPos(GetDlgItem(hDlg, IDC_CHECK_AGREE), NULL, 0, 0, rc.right - rc.left + ScaleDPI(35), rc.bottom - rc.top, SWP_NOMOVE);
+
+		rc = GetCtrlLocalCoordinates(GetDlgItem(hDlg, IDC_SYSLINK_TERMS));
+		SetWindowPos(GetDlgItem(hDlg, IDC_SYSLINK_TERMS), NULL, rc.left + ScaleDPI(37), rc.top, 0, 0, SWP_NOSIZE);
+
+		rc = GetCtrlLocalCoordinates(GetDlgItem(hDlg, IDC_STATIC_HAVEACCOUNT));
+		SetWindowPos(GetDlgItem(hDlg, IDC_STATIC_HAVEACCOUNT), NULL, 0, 0, rc.right - rc.left - ScaleDPI(35), rc.bottom - rc.top, SWP_NOMOVE);
+
+		rc = GetCtrlLocalCoordinates(GetDlgItem(hDlg, IDC_SYSLINK_SIGNIN));
+		SetWindowPos(GetDlgItem(hDlg, IDC_SYSLINK_SIGNIN), NULL, rc.left - ScaleDPI(25), rc.top, 0, 0, SWP_NOSIZE);
+		
+	} else {
+		SetWindowText(GetDlgItem(hDlg, IDC_CHECK_AGREE), i18nHelper.Geti18nItem("terms_check").substr(0, 14).c_str());
+		SetWindowText(GetDlgItem(hDlg, IDC_SYSLINK_TERMS), (L"<a>" + i18nHelper.Geti18nItem("terms_check").substr(15, 12) + L"</a>").c_str());
+	}
+
+	SetWindowText(hDlg, i18nHelper.Geti18nItem("login_title").c_str());
+}
+
 void SwitchGUIStateToSignin(HWND hDlg)
 {
+	Ci18n& i18nHelper = Ci18n::Instance();
+
 	ShowWindow(GetDlgItem(hDlg, IDC_STATIC_FNAME), 0);
 	ShowWindow(GetDlgItem(hDlg, IDC_STATIC_LNAME), 0);
 	ShowWindow(GetDlgItem(hDlg, IDC_EDIT_FNAME), 0);
@@ -19,7 +61,7 @@ void SwitchGUIStateToSignin(HWND hDlg)
 	ShowWindow(GetDlgItem(hDlg, IDC_STATIC_HAVEACCOUNT), 0);
 	ShowWindow(GetDlgItem(hDlg, IDC_SYSLINK_SIGNIN), 0);
 
-	SetWindowText(GetDlgItem(hDlg, IDOK), L"Sign in");
+	SetWindowText(GetDlgItem(hDlg, IDOK), i18nHelper.Geti18nItem("sign_in_btn").c_str());
 
 	RECT rc;
 	int yShift = 85;	// pixels
@@ -58,7 +100,7 @@ void HandleCredentials(HWND hDlg, WPARAM wParam, CLoginHandler& loginHandler)
 		if (loginHandler.LogIn(bufLogin, bufPass)) {
 			CSettingsHandler::Instance().SetCreds(bufLogin, bufPass);
 			CSettingsHandler::Instance().SaveSettings();
-			EndDialog(hDlg, LOWORD(wParam));
+			EndDialog(hDlg, true);
 		} else {
 			MessageBox(hDlg, L"Failed to log in", L"App", MB_ICONEXCLAMATION);
 		}
@@ -88,8 +130,8 @@ INT_PTR CALLBACK LoginDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
 	switch (message)
 	{
 	case WM_INITDIALOG:
-
-		loginHandler.hParent = GetParent(hDlg);
+		
+		InitGuiElements(hDlg);
 
 		if (loginHandler.HaveAccount()) {
 			SwitchGUIStateToSignin(hDlg);
@@ -120,7 +162,7 @@ INT_PTR CALLBACK LoginDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
 
 			case IDCANCEL:
 
-				EndDialog(hDlg, LOWORD(wParam));
+				EndDialog(hDlg, false);
 				PostQuitMessage(0);
 				return (INT_PTR)TRUE;
 
@@ -157,6 +199,8 @@ void CLoginHandler::SetHaveAccount(bool value)
 	haveAccount = value;
 }
 
+using namespace rapidjson;
+
 bool CLoginHandler::LogIn(const std::wstring& userID, const std::wstring& pass)
 {
 	if (!IsCredsValid(userID, pass)) {
@@ -171,10 +215,10 @@ bool CLoginHandler::LogIn(const std::wstring& userID, const std::wstring& pass)
 	std::string postForm(std::string(PARAM_EMAIL) + "=" + narrowUserID + "&" + PARAM_PASS + "=" + narrowPass);
 	std::string postResData;
 
-	if (PostHttps(std::string(BASE_URL) + std::string(METHOD_LOGIN), postForm, postResData)) {
+	if (PostHttp(std::string(BASE_URL) + std::string(METHOD_LOGIN), postForm, postResData)) {
 
 		// parse JSON
-		rapidjson::Document doc;
+		Document doc;
 		if (doc.Parse(postResData.c_str()).HasParseError()) {
 			return false;
 		}
@@ -182,20 +226,26 @@ bool CLoginHandler::LogIn(const std::wstring& userID, const std::wstring& pass)
 		if (doc.HasMember(FIELD_SUCCESS) && doc[FIELD_SUCCESS].IsNumber()) {
 			if (doc["success"].GetInt() == 1) {
 
-				rapidjson::Value::ConstMemberIterator itrData = doc.FindMember(FIELD_DATA);
+				Value::ConstMemberIterator itrData = doc.FindMember(FIELD_DATA);
 				if (itrData != doc.MemberEnd()) {
 
-					rapidjson::Value::ConstMemberIterator itr = itrData->value.FindMember(FIELD_TOKEN);
-					if (itr != itrData->value.MemberEnd()) {
-						if (itr->value.IsString()) {
-							loggedIn = true;
-							token.assign(itr->value.GetString());
-							PostMessage(hParent, UM_LOGIN_COMPLETE, 0, 0);
-							/**/
-							loginTrace = postResData;
-							/**/
-							return true;
-						}
+					Value::ConstMemberIterator itrLangCode = itrData->value.FindMember(FIELD_LANG);
+					if (itrLangCode != itrData->value.MemberEnd() && itrLangCode->value.IsString()) {
+						Ci18n& i18nHelper = Ci18n::Instance();
+						std::wstring langCode;
+						UTF8ToWs(itrLangCode->value.GetString(), langCode);
+						i18nHelper.SetLangCode(langCode);
+					}
+
+					Value::ConstMemberIterator itrToken = itrData->value.FindMember(FIELD_TOKEN);
+					if (itrToken != itrData->value.MemberEnd() && itrToken->value.IsString()) {
+
+						loggedIn = true;
+						token.assign(itrToken->value.GetString());
+						/* TODO: remove*/
+						loginTrace = postResData;
+
+						return true;
 					}
 				}
 			}
@@ -223,7 +273,7 @@ bool CLoginHandler::SignUp(const std::wstring& userID, const std::wstring& pass,
 	std::string postForm(std::string(PARAM_EMAIL) + "=" + narrowUserID + "&" + PARAM_PASS + "=" + narrowPass + "&" + PARAM_FNAME + "=" + narrowFName + "&" + PARAM_LNAME + "=" + narrowLName);
 	std::string postResData;
 
-	if (PostHttps(std::string(BASE_URL) + std::string(METHOD_SIGNUP), postForm, postResData)) {
+	if (PostHttp(std::string(BASE_URL) + std::string(METHOD_SIGNUP), postForm, postResData)) {
 
 		// parse JSON
 		rapidjson::Document doc;
@@ -254,7 +304,7 @@ void CLoginHandler::LogOut()
 	std::string postForm(std::string(PARAM_TOKEN) + "=" + token);
 	std::string postResData;
 
-	PostHttps(std::string(BASE_URL) + std::string(METHOD_LOGOUT), postForm, postResData);
+	PostHttp(std::string(BASE_URL) + std::string(METHOD_LOGOUT), postForm, postResData);
 }
 
 bool CLoginHandler::IsCredsValid(const std::wstring& userID, const std::wstring& pass)

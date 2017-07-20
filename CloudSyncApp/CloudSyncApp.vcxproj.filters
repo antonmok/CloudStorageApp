@@ -60,6 +60,9 @@
     <ClInclude Include="DlgControllers\UpdatesHandler.h">
       <Filter>Header Files\DlgControllers</Filter>
     </ClInclude>
+    <ClInclude Include="Include\i18n.h">
+      <Filter>Header Files\Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DlgControllers\LoginHandler.cpp">
@@ -85,6 +88,9 @@
     </ClCompile>
     <ClCompile Include="DlgControllers\UpdatesHandler.cpp">
       <Filter>Source Files\DlgControllers</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\i18n.cpp">
+      <Filter>Source Files\Source</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

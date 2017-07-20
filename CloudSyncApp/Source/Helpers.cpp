@@ -4,6 +4,7 @@
 #include <string>
 #include <sstream>
 #include <iterator>
+#include <Shellapi.h>
 
 template<typename Out>
 void split(const std::string &s, char delim, Out result)
@@ -34,6 +35,16 @@ bool IsFilteredAction(const std::wstring& action, const std::wstring& name)
 
 	return false;
 }
+
+void UTF8ToWs(const std::string& str, std::wstring& outStr)
+{	
+	int wideBufSize = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), NULL, 0);
+	std::wstring wideBuf(wideBufSize, 0);
+
+	MultiByteToWideChar(CP_UTF8, 0, str.c_str(), str.size(), &wideBuf[0], wideBufSize);
+	outStr.assign(wideBuf);
+}
+
 
 void s2ws(const std::string& str, std::wstring& outStr)
 {
@@ -175,6 +186,27 @@ void EditAppendText(const HWND &hwndOutput, const std::wstring& newText)
 
 	// restore the previous selection
 	SendMessage(hwndOutput, EM_SETSEL, StartPos, EndPos);
+}
+
+bool ExecInstaller(const std::wstring& path, const std::wstring& cmd)
+{
+	SHELLEXECUTEINFO shExInfo = { 0 };
+	shExInfo.cbSize = sizeof(shExInfo);
+	shExInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
+	shExInfo.hwnd = 0;
+	shExInfo.lpVerb = L"runas";
+	shExInfo.lpFile = path.c_str();
+	shExInfo.lpParameters = cmd.c_str();
+	shExInfo.lpDirectory = 0;
+	shExInfo.nShow = SW_SHOW;
+	shExInfo.hInstApp = 0;
+
+	if (ShellExecuteEx(&shExInfo)) {
+		CloseHandle(shExInfo.hProcess);
+		return true;
+	}
+
+	return false;
 }
 
 bool RunProcess(std::wstring path, std::wstring cmd)

@@ -28,6 +28,9 @@ public:
 	void SetSyncPath(const std::wstring& szPath);
 	const std::wstring& GetSyncPath();
 
+	void SetLangCode(const std::wstring& szLangCode);
+	const std::wstring& GetLangCode();
+
 private:
 	
 	CSettingsHandler() {};
@@ -36,5 +39,5 @@ private:
 	std::wstring userID;
 	std::wstring pass;
 	std::wstring syncPath;
-
+	std::wstring langCode;
 };
