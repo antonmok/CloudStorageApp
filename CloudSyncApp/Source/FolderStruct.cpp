@@ -2,9 +2,14 @@
 
 #include "FolderStruct.h"
 #include <Shobjidl.h>
+#include <thread>
+#include "EncodingHelper.h"
 #include "Helpers.h"
+#include "NetHelper.h"
 #include "SettingsHandler.h"
+#include "LoginHandler.h"
 #include "JSONFields.h"
+#include "resource.h"
 
 bool IsINode(const std::wstring fileName)
 {
@@ -14,6 +19,15 @@ bool IsINode(const std::wstring fileName)
 bool CDirectoryTree::LocalTreeIsSet()
 {
 	if (localTree.number_of_siblings(localTree.head)) {
+		return true;
+	}
+
+	return false;
+}
+
+bool CDirectoryTree::LocalTreeIsNotEmpty()
+{
+	if (localTree.number_of_children(localTree.head->next_sibling)) {
 		return true;
 	}
 
@@ -277,23 +291,149 @@ void CDirectoryTree::IterateTree(THandleNodeCallback HandleNodeCallback, bool re
 	TreeIterator(remote ? remoteTree : localTree, it, HandleNodeCallback);
 }
 
+bool CDirectoryTree::RemoteNodeExist(const std::string& name, const std::string& remotePath, std::string& pathId)
+{
+	bool found = false;
+
+	THandleNodeCallback FindObject = [&found, &name, &remotePath, &pathId](TDirTree::iterator nodeIt)
+	{
+		SDirNode& node = *nodeIt;
+
+		if (node.remotePath == remotePath && node.name == name) {
+			found = true;
+			// update remote path for local tree
+			pathId = node.pathId;
+			// stop iterating
+			return false;
+		}
+
+		return true;
+	};
+
+	IterateTree(FindObject, true);
+
+	return found;
+}
+
+std::string GetNewObjectId(const std::string jsonStr)
+{
+	std::string idStr;
+
+	// parse JSON
+	Document doc;
+	if (doc.Parse(jsonStr.c_str()).HasParseError()) {
+		return "";
+	}
+
+	if (doc.HasMember(FIELD_SUCCESS) && doc[FIELD_SUCCESS].IsNumber()) {
+		if (doc["success"].GetInt() == 1) {
+
+			Value::ConstMemberIterator itrData = doc.FindMember(FIELD_DATA);
+			if (itrData != doc.MemberEnd()) {
+
+				Value::ConstMemberIterator itrId = itrData->value.FindMember(FIELD_OBJ_ID);
+				if (itrId != itrData->value.MemberEnd()) {
+					idStr = itrId->value.GetString();
+				}
+			}
+		}
+	}
+
+	return idStr;
+}
+
+void CDirectoryTree::UploadFiles(HWND hDlg)
+{
+	std::thread watchDirThread(&CDirectoryTree::UploadFilesFunc, std::ref(*this), hDlg);
+	watchDirThread.detach();
+}
+
+void CDirectoryTree::UploadFilesFunc(HWND hDlg)
+{
+
+	if (LocalTreeIsNotEmpty()) {
+
+		bool root = true;
+		CLoginHandler& loginHandler = CLoginHandler::Instance();
+
+		THandleNodeCallback UploadObjects = [hDlg, &root, &loginHandler, this](TDirTree::iterator nodeIt)
+		{
+			SDirNode& node = *nodeIt;
+			std::wstring wideLocalPath;
+			std::wstring wideName;
+			std::wstring traceStr;
+			std::string response;
+			std::string newObjId;
+			std::string remotePath;
+			bool creationRes = false;
+
+			s2ws(node.localPath, wideLocalPath);
+			s2ws(node.name, wideName);
+
+			// get remote path for object
+			if (!root) {
+				const SDirNode& parentNode = nodeIt.node->parent->data;
+
+				if (parentNode.remotePath == "") {
+					node.remotePath = "," + parentNode.pathId + ",";
+				} else {
+					node.remotePath = parentNode.remotePath + parentNode.pathId + ",";
+				}
+
+				// check if it is not exist already remotely
+				if (RemoteNodeExist(node.name, node.remotePath, node.pathId)) {
+					// skip this node
+					EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\nObject already exist on server: " + wideLocalPath + L"\\" + wideName).c_str());
+					return true;
+				}
+
+			} else {
+				root = false;
+				if (node.pathId.size()) {
+					//no need to create remote root
+					return true;
+				}
+			}
+
+			if (node.isFile) {
+				creationRes = CreateObject(std::string(BASE_URL) + METHOD_CREATE_FILE, node.localPath, node.remotePath, node.name, loginHandler.GetToken(), response);
+				traceStr = L"file";
+			} else {
+				std::string fields(std::string(PARAM_TOKEN) + "=" + loginHandler.GetToken() + "&" + PARAM_NAME + "=" + node.name + "&" + PARAM_PATH + "=" + node.remotePath);
+				creationRes = PostHttp(std::string(BASE_URL) + METHOD_CREATE_FOLDER, fields, response);
+				traceStr = L"folder";
+			}
+
+			if (creationRes) {
+				// extract new object id
+				newObjId = GetNewObjectId(response);
+				node.pathId = newObjId;
+
+				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\n" + traceStr + L" created: " + wideLocalPath + L"\\" + wideName).c_str());
+			} else {
+				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\nFailed to create " + traceStr + L": " + wideLocalPath + L"\\" + wideName).c_str());
+				return false;
+			}
+
+			return true;
+		};
+
+		IterateTree(UploadObjects, false);
+		PostMessage(hDlg, UM_UPLOAD_COMPLETE, 0, 0);
+	} else {
+		PostMessage(hDlg, UM_UPLOAD_COMPLETE, 0, 0);
+		MessageBox(hDlg, L"Upload directory is empty", L"Error", MB_ICONEXCLAMATION);
+	}
+}
+
 bool SelectPathDialog(std::wstring& path)
 {
 	IFileDialog *pfd;
 	WCHAR* pathBuf = NULL;
-	std::wstring szEXEDesc(L"Executable file");
-
-	/*COMDLG_FILTERSPEC rgSpec[] = {
-	{ szEXEDesc.c_str(), L"*.exe" },
-	};*/
 
 	HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
 
 	if (SUCCEEDED(hr)) {
-
-		/*if (!SUCCEEDED(pfd->SetFileTypes(1, rgSpec))) {
-		return false;
-		}*/
 
 		DWORD dwOptions;
 		if (SUCCEEDED(pfd->GetOptions(&dwOptions)))
@@ -319,9 +459,25 @@ bool SelectPathDialog(std::wstring& path)
 	return false;
 }
 
-void WatchDirectory(const std::wstring& szDir, HWND hMainWnd)
+void CDirectoryTree::StopWatchingDir()
 {
-	HANDLE hDir = CreateFile(
+	if (hDir != INVALID_HANDLE_VALUE) {
+		CancelIoEx(hDir, NULL);
+		hDir = INVALID_HANDLE_VALUE;
+	}
+}
+
+void CDirectoryTree::WatchDirectory(const std::wstring& szDir, HWND hMainWnd)
+{
+	StopWatchingDir();
+
+	std::thread watchDirThread(&CDirectoryTree::WatchDirectoryFunc, std::ref(*this), szDir, hMainWnd);
+	watchDirThread.detach();
+}
+
+void CDirectoryTree::WatchDirectoryFunc(const std::wstring& szDir, HWND hMainWnd)
+{
+	hDir = CreateFile(
 		szDir.c_str(),                                // pointer to the file name
 		FILE_LIST_DIRECTORY,                // access (read/write) mode
 		// Share mode MUST be the following to avoid problems with renames via Explorer!
@@ -337,8 +493,11 @@ void WatchDirectory(const std::wstring& szDir, HWND hMainWnd)
 		return;
 	}
 
+	watchedDir = szDir;
+
 	char szBuffer[1024 * 128];
 	DWORD BytesReturned;
+
 	while (ReadDirectoryChangesW(
 		hDir,                          // handle to directory
 		&szBuffer,                       // read results buffer
@@ -354,30 +513,58 @@ void WatchDirectory(const std::wstring& szDir, HWND hMainWnd)
 		&BytesReturned,                // bytes returned
 		NULL,                          // overlapped buffer
 		NULL                           // completion routine
-		)
-		) {
+		)) {
+
 		DWORD dwOffset = 0;
 		FILE_NOTIFY_INFORMATION* pInfo = NULL;
 
 		do {
 			// Get a pointer to the first change record...
 			pInfo = (FILE_NOTIFY_INFORMATION*)&szBuffer[dwOffset];
-
-			std::wstring action = L"*";
-			switch (pInfo->Action) {
-				case FILE_ACTION_ADDED: action = L"Added"; break;
-				case FILE_ACTION_REMOVED: action = L"Deleted"; break;
-				case FILE_ACTION_MODIFIED: action = L"Modified"; break;
-				case FILE_ACTION_RENAMED_OLD_NAME: action = L"Old name"; break;
-				case FILE_ACTION_RENAMED_NEW_NAME: action = L"New name"; break;
-			}
-
 			std::wstring szFileName(pInfo->FileName, pInfo->FileNameLength / 2);
-
-			PostMessage(hMainWnd, UM_FILES_CHANGED, (WPARAM)(new std::wstring(action)), (WPARAM)(new std::wstring(szFileName)));
+			PostMessage(hMainWnd, UM_FILES_CHANGED, (WPARAM)(pInfo->Action), (LPARAM)(new std::wstring(szFileName)));
 
 			// More than one change may happen at the same time. Load the next change and continue...
 			dwOffset += pInfo->NextEntryOffset;
 		} while (pInfo->NextEntryOffset != 0);
 	}
+}
+
+bool IsDirectory(const std::wstring path)
+{
+	if (GetFileAttributes(path.c_str()) == FILE_ATTRIBUTE_DIRECTORY) {
+		return true;
+	}
+	return false;
+}
+
+bool IsFilteredUploadAction(int action, const std::wstring& name)
+{
+	if (action == FILE_ACTION_RENAMED_OLD_NAME) {
+		return true;
+	} else if (action == FILE_ACTION_RENAMED_NEW_NAME) {
+		return true;
+	} else if (action == FILE_ACTION_MODIFIED) {
+		
+		/*if (IsDirectory()) {
+			return true;
+		}*/
+
+		return true;
+	} else if (action == FILE_ACTION_REMOVED) {
+		return true;
+	}
+
+	return false;
+}
+
+bool IsFilteredUIAction(int action, const std::wstring& name)
+{
+	if (action == FILE_ACTION_RENAMED_OLD_NAME) {
+		return true;
+	} else if (action == FILE_ACTION_MODIFIED) {
+		return true;
+	}
+
+	return false;
 }

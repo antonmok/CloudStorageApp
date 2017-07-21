@@ -5,6 +5,7 @@
 #include "SettingsHandler.h"
 #include "i18n.h"
 #include "NetHelper.h"
+#include "EncodingHelper.h"
 #include "Helpers.h"
 #include "resource.h"
 #include "cereal/external/rapidjson/document.h"
@@ -86,7 +87,7 @@ void SwitchGUIStateToSignin(HWND hDlg)
 	SetWindowPos(hDlg, NULL, 0, 0, rc.right - rc.left, (rc.bottom - rc.top) - ScaleDPI(yShift + 13), SWP_NOMOVE);
 }
 
-void HandleCredentials(HWND hDlg, WPARAM wParam, CLoginHandler& loginHandler)
+void CLoginHandler::HandleCredentials(HWND hDlg, WPARAM wParam)
 {
 	wchar_t bufFName[256] = {};
 	wchar_t bufLName[256] = {};
@@ -96,8 +97,8 @@ void HandleCredentials(HWND hDlg, WPARAM wParam, CLoginHandler& loginHandler)
 	GetWindowText(GetDlgItem(hDlg, IDC_EDIT_LOGIN), bufLogin, 256);
 	GetWindowText(GetDlgItem(hDlg, IDC_EDIT_PASS), bufPass, 256);
 
-	if (loginHandler.HaveAccount()) {
-		if (loginHandler.LogIn(bufLogin, bufPass)) {
+	if (HaveAccount()) {
+		if (LogIn(bufLogin, bufPass)) {
 			CSettingsHandler::Instance().SetCreds(bufLogin, bufPass);
 			CSettingsHandler::Instance().SaveSettings();
 			EndDialog(hDlg, true);
@@ -108,9 +109,9 @@ void HandleCredentials(HWND hDlg, WPARAM wParam, CLoginHandler& loginHandler)
 		GetWindowText(GetDlgItem(hDlg, IDC_EDIT_FNAME), bufFName, 256);
 		GetWindowText(GetDlgItem(hDlg, IDC_EDIT_LNAME), bufLName, 256);
 
-		if (loginHandler.SignUp(bufLogin, bufPass, bufFName, bufLName)) {
+		if (SignUp(bufLogin, bufPass, bufFName, bufLName)) {
 			SwitchGUIStateToSignin(hDlg);
-			loginHandler.SetHaveAccount(true);
+			SetHaveAccount(true);
 			MessageBox(hDlg, L"You have been registered. Now you can sign in", L"App", MB_OK);
 			SetWindowText(GetDlgItem(hDlg, IDC_EDIT_LOGIN), L"");
 			SetWindowText(GetDlgItem(hDlg, IDC_EDIT_PASS), L"");
@@ -168,7 +169,7 @@ INT_PTR CALLBACK LoginDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPa
 
 			case IDOK:
 
-				HandleCredentials(hDlg, wParam, loginHandler);
+				loginHandler.HandleCredentials(hDlg, wParam);
 				return (INT_PTR)TRUE;
 
 			case IDC_CHECK_AGREE:

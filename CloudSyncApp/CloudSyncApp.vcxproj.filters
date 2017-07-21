@@ -63,6 +63,9 @@
     <ClInclude Include="Include\i18n.h">
       <Filter>Header Files\Include</Filter>
     </ClInclude>
+    <ClInclude Include="Include\EncodingHelper.h">
+      <Filter>Header Files\Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DlgControllers\LoginHandler.cpp">
@@ -90,6 +93,9 @@
       <Filter>Source Files\DlgControllers</Filter>
     </ClCompile>
     <ClCompile Include="Source\i18n.cpp">
+      <Filter>Source Files\Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EncodingHelper.cpp">
       <Filter>Source Files\Source</Filter>
     </ClCompile>
   </ItemGroup>

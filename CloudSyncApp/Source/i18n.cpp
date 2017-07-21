@@ -1,10 +1,18 @@
 #define NOMINMAX
 
 #include "stdafx.h"
+
+
+#include <cctype>
+#include <locale>
+
+
 #include "i18n.h"
 #include "cereal/external/rapidjson/document.h"
 #include "cereal/external/rapidjson/reader.h"
 #include "JSONFields.h"
+#include "EncodingHelper.h"
+#include "NetHelper.h"
 #include "Helpers.h"
 
 using namespace rapidjson;
@@ -14,7 +22,7 @@ void Ci18n::SetLangCodeFromSystemLocale()
 	std::wstring localeName(LOCALE_NAME_MAX_LENGTH, 0);
 	GetUserDefaultLocaleName(&localeName[0], LOCALE_NAME_MAX_LENGTH);
 	localeName = localeName.substr(0, 2);
-	for (auto & c : localeName) c = std::toupper(c, std::locale());
+	StrToupper(localeName);
 	SetLangCode(localeName);
 }
 
@@ -235,4 +243,14 @@ void Ci18n::SetLangCode(ELangCode languageCode)
 Ci18n::ELangCode Ci18n::GetLangCode()
 {
 	return langCode;
+}
+
+void Ci18n::GetTranslationsFromServer()
+{
+	std::string fields(std::string(PARAM_TYPE) + "=" + TRANSLATION_TYPE);
+	std::string responce;
+
+	if (PostHttp(std::string(BASE_URL) + METHOD_I18N, fields, responce)) {
+		Seti18nDataFromJSON(responce);
+	}
 }

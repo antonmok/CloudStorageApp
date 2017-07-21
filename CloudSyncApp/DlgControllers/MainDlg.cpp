@@ -14,6 +14,7 @@
 #include "UpdatesHandler.h"
 #include "i18n.h"
 #include "Helpers.h"
+#include "EncodingHelper.h"
 #include "NetHelper.h"
 #include "FolderStruct.h"
 
@@ -35,22 +36,22 @@ CDirectoryTree& dirTreeInstance = CDirectoryTree::Instance();
 CUpdateHandler& updateHandler = CUpdateHandler::Instance();
 Ci18n& i18nHelper = Ci18n::Instance();
 
-bool g_FilesChangedTriggered = false;
-
 // Forward declarations of functions included in this code module:
-BOOL				InitInstance(HINSTANCE, int);
 INT_PTR CALLBACK	MainDlgProc(HWND, UINT, WPARAM, LPARAM);
-void ShowLocalTree(HWND hDlg);
 
-int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPTSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
+{
+	hInst = hInstance;
+	DialogBox(hInstance, MAKEINTRESOURCE(IDD_DIALOG_MAIN), NULL, MainDlgProc);
+
+	return TRUE;
+}
+
+int APIENTRY _tWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPTSTR lpCmdLine, _In_ int nCmdShow)
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
- 	// TODO: Place code here.
 	MSG msg;
 	HACCEL hAccelTable;
 
@@ -79,21 +80,22 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance,
 	return (int) msg.wParam;
 }
 
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
+void ShowLocalTree(HWND hDlg)
 {
-	hInst = hInstance;
-	DialogBox(hInstance, MAKEINTRESOURCE(IDD_DIALOG_MAIN), NULL, MainDlgProc);
-
-	return TRUE;
+	dirTreeInstance.InitLocalTree(settingsHandler.GetSyncPath());
+	dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE), false);
 }
 
-void GetTranslations()
+void ShowRemoteTree(HWND hDlg)
 {
-	std::string fields(std::string(PARAM_TYPE) + "=" + TRANSLATION_TYPE);
-	std::string responce;
+	std::string fields("token=");
+	std::string response;
 
-	if (PostHttp(std::string(BASE_URL) + METHOD_I18N, fields, responce)) {
-		i18nHelper.Seti18nDataFromJSON(responce);
+	fields.append(loginHandler.GetToken());
+
+	if (PostHttp(std::string(BASE_URL) + METHOD_GET_TREE, fields, response)) {
+		dirTreeInstance.InitRemoteTree(response);
+		dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE_REMOTE), true);
 	}
 }
 
@@ -111,8 +113,7 @@ void InitGUIControls(HWND hDlg)
 		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
 
 		// start new thread to listen for files changes
-		std::thread watchDirThread(WatchDirectory, settingsHandler.GetSyncPath(), hDlg);
-		watchDirThread.detach();
+		dirTreeInstance.WatchDirectory(settingsHandler.GetSyncPath(), hDlg);
 		ShowLocalTree(hDlg);
 	}
 
@@ -126,23 +127,12 @@ void InitGUIControls(HWND hDlg)
 
 }
 
-void ShowRemoteTree(HWND hDlg)
+void SetUIToUploadState(HWND hDlg)
 {
-	std::string fields("token=");
-	std::string response;
-
-	fields.append(loginHandler.GetToken());
-
-	if (PostHttp(std::string(BASE_URL) + METHOD_GET_TREE, fields, response)) {
-		dirTreeInstance.InitRemoteTree(response);
-		dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE_REMOTE), true);
-	}
-}
-
-void ShowLocalTree(HWND hDlg)
-{
-	dirTreeInstance.InitLocalTree(settingsHandler.GetSyncPath());
-	dirTreeInstance.InitTreeCtrl(GetDlgItem(hDlg, IDC_TREE), false);
+	ShowWindow(GetDlgItem(hDlg, IDC_PROGRESS), SW_SHOW);
+	SendMessage(GetDlgItem(hDlg, IDC_PROGRESS), PBM_SETMARQUEE, 1, 20);
+	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), FALSE);
+	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), i18nHelper.Geti18nItem("upload_btn_dis").c_str());
 }
 
 void SetMainWindowPos(HWND hWnd)
@@ -160,137 +150,121 @@ void SetMainWindowPos(HWND hWnd)
 	SetWindowPos(hWnd, NULL, width / 2 - wndWidth / 2, height / 2 - wndHeight / 2, 0, 0, SWP_NOSIZE);
 }
 
-std::string GetNewObjectId(const std::string jsonStr)
+// Events handlers
+INT_PTR OnFilesChanged(HWND hDlg, WPARAM wParam, LPARAM lParam)
 {
-	std::string idStr;
+	int action = wParam;
+	std::shared_ptr<std::wstring> fileName(reinterpret_cast<std::wstring*>(lParam));
 
-	// parse JSON
-	Document doc;
-	if (doc.Parse(jsonStr.c_str()).HasParseError()) {
-		return "";
+	LogFileAction(GetDlgItem(hDlg, IDC_EDIT_TRACE), action, *fileName);
+	if (!IsFilteredUIAction(action, *fileName)) {
+		ShowLocalTree(hDlg);
 	}
 
-	if (doc.HasMember(FIELD_SUCCESS) && doc[FIELD_SUCCESS].IsNumber()) {
-		if (doc["success"].GetInt() == 1) {
+	if (!IsFilteredUploadAction(action, *fileName)) {
+		SetUIToUploadState(hDlg);
+		PostMessage(hDlg, UM_UPLOAD_FILES, 0, 0);
+	}
 
-			Value::ConstMemberIterator itrData = doc.FindMember(FIELD_DATA);
-			if (itrData != doc.MemberEnd()) {
-				
-				Value::ConstMemberIterator itrId = itrData->value.FindMember(FIELD_OBJ_ID);
-				if (itrId != itrData->value.MemberEnd()) {
-					idStr = itrId->value.GetString();
+	return (INT_PTR)TRUE;
+}
+
+INT_PTR OnCheckLogin(HWND hDlg)
+{
+	if (!loginHandler.IsLoggedIn()) {
+		if (settingsHandler.HaveCredentials()) {
+			if (loginHandler.LogIn(settingsHandler.GetUserID(), settingsHandler.GetPass())) {
+				PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
+			} else {
+				settingsHandler.SetCreds(L"", L"");
+				settingsHandler.SaveSettings();
+				if (DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc)) {
+					PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
 				}
+			}
+
+		} else {
+			if (DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc)) {
+				PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
 			}
 		}
 	}
 
-	return idStr;
+	return (INT_PTR)TRUE;
 }
 
-bool RemotelyExist(const std::string& name, const std::string& remotePath, std::string& pathId)
+INT_PTR OnLoginComplete(HWND hDlg)
 {
-	bool found = false;
+	std::wstring wideStr;
+	s2ws(loginHandler.loginTrace, wideStr);
+	EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"Sign In responce:\r\n" + wideStr + L"\r\n");
 
-	THandleNodeCallback FindObject = [&found, &name, &remotePath, &pathId](TDirTree::iterator nodeIt)
-	{
-		SDirNode& node = *nodeIt;
+	ShowRemoteTree(hDlg);
 
-		if (node.remotePath == remotePath && node.name == name) {
-			found = true;
-			// update remote path for local tree
-			pathId = node.pathId;
-			// stop iterating
-			return false;
-		}
+	InitGUIControls(hDlg);
 
-		return true;
-	};
+	// start new thread to check updates
+	std::thread checkUpdatesThread(&CUpdateHandler::CheckUpdates, std::ref(updateHandler), hDlg);
+	checkUpdatesThread.detach();
 
-	dirTreeInstance.IterateTree(FindObject, true);
-
-	return found;
+	return (INT_PTR)TRUE;
 }
 
-void UploadFiles(HWND hDlg) {
+INT_PTR OnExitClicked(HWND hDlg, WPARAM wParam)
+{
+	loginHandler.LogOut();
+	EndDialog(hDlg, LOWORD(wParam));
+	PostQuitMessage(0);
+	return (INT_PTR)TRUE;
+}
 
-	if (dirTreeInstance.LocalTreeIsSet()) {
+INT_PTR OnLogOutClicked(HWND hDlg)
+{
+	settingsHandler.SetCreds(L"", L"");
+	settingsHandler.SaveSettings();
+	loginHandler.LogOut();
+	PostMessage(hDlg, UM_CHECK_LOGIN, NULL, NULL);
 
-		bool root = true;
+	return (INT_PTR)TRUE;
+}
 
-		THandleNodeCallback UploadObject = [hDlg, &root](TDirTree::iterator nodeIt)
-		{
-			SDirNode& node = *nodeIt;
-			std::wstring wideLocalPath;
-			std::wstring wideName;
-			std::wstring traceStr;
-			std::string response;
-			std::string newObjId;
-			std::string remotePath;
-			bool creationRes = false;
+INT_PTR OnSetFolderClicked(HWND hDlg)
+{
+	std::wstring path;
 
-			s2ws(node.localPath, wideLocalPath);
-			s2ws(node.name, wideName);
+	if (SelectPathDialog(path)) {
+		settingsHandler.SetSyncPath(path);
+		settingsHandler.SaveSettings();
 
-			// get remote path for object
-			if (!root) {
-				const SDirNode& parentNode = nodeIt.node->parent->data;
-
-				if (parentNode.remotePath == "") {
-					node.remotePath = "," + parentNode.pathId + ",";
-				} else {
-					node.remotePath = parentNode.remotePath + parentNode.pathId + ",";
-				}
-				
-				// check if it is not exist already remotely
-				if (RemotelyExist(node.name, node.remotePath, node.pathId)) {
-					// skip this node
-					EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\nObject already exist on server: " + wideLocalPath + L"\\" + wideName).c_str());
-					return true;
-				}
-
-			} else {
-				root = false;
-				if (node.pathId.size()) {
-					//no need to create remote root
-					return true;
-				}
-			}
-
-			if (node.isFile) {
-				creationRes = CreateObject(std::string(BASE_URL) + METHOD_CREATE_FILE, node.localPath, node.remotePath, node.name, loginHandler.GetToken(), response);
-				traceStr = L"file";
-			} else {
-				std::string fields(std::string(PARAM_TOKEN) + "=" + loginHandler.GetToken() + "&" + PARAM_NAME + "=" + node.name + "&" + PARAM_PATH + "=" + node.remotePath);
-				creationRes = PostHttp(std::string(BASE_URL) + METHOD_CREATE_FOLDER, fields, response);
-				traceStr = L"folder";
-			}
-
-			if (creationRes) {
-				// extract new object id
-				newObjId = GetNewObjectId(response);
-				node.pathId = newObjId;
-
-				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\n" + traceStr + L" created: " + wideLocalPath + L"\\" + wideName).c_str());
-			} else {
-				EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), (L"\r\nFailed to create " + traceStr + L": " + wideLocalPath + L"\\" + wideName).c_str());
-				return false;
-			}
-
-			return true;
-		};
-
-		dirTreeInstance.IterateTree(UploadObject, false);
-		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"\r\n");
-		ShowRemoteTree(hDlg);
-		
-	} else {
-		MessageBox(hDlg, L"Upload directory is empty", L"Error", MB_ICONEXCLAMATION);
+		SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (i18nHelper.Geti18nItem("folder_lb") + L"\n" + path).c_str());
+		EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
+		// start new thread to listen for files changes
+		dirTreeInstance.WatchDirectory(settingsHandler.GetSyncPath(), hDlg);
+		ShowLocalTree(hDlg);
 	}
+
+	return (INT_PTR)TRUE;
+}
+
+INT_PTR OnUploadClicked(HWND hDlg)
+{
+	SetUIToUploadState(hDlg);
+	PostMessage(hDlg, UM_UPLOAD_FILES, 0, 0);
+
+	return (INT_PTR)TRUE;
+}
+
+INT_PTR OnUploadComplete(HWND hDlg)
+{
+	EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"\r\n");
+	ShowRemoteTree(hDlg);
 
 	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), TRUE);
+	SendMessage(GetDlgItem(hDlg, IDC_PROGRESS), PBM_SETMARQUEE, 0, 0);
+	ShowWindow(GetDlgItem(hDlg, IDC_PROGRESS), SW_HIDE);
 	SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), i18nHelper.Geti18nItem("upload_btn").c_str());
 
-	return;
+	return (INT_PTR)TRUE;
 }
 
 // Message handler
@@ -299,75 +273,31 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 	UNREFERENCED_PARAMETER(lParam);
 
 	int browserFLag = 0;
-	std::wstring path;
 	
 	switch (message)
 	{
 	case WM_INITDIALOG:
 
 		settingsHandler.InitSettings();
-		GetTranslations();
+		i18nHelper.GetTranslationsFromServer();
 		SetMainWindowPos(hDlg);
-
 		return (INT_PTR)TRUE;
 
 	case UM_FILES_CHANGED:
-	{
-		std::shared_ptr<std::wstring> action(reinterpret_cast<std::wstring*>(wParam));
-		std::shared_ptr<std::wstring> fileName(reinterpret_cast<std::wstring*>(lParam));
-
-		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), *action + L": " + *fileName + L"\r\n");
-		
-		if (!IsFilteredAction(*action, *fileName)) {
-			//UploadFiles(hDlg);
-			ShowLocalTree(hDlg);
-		}
-
-		return (INT_PTR)TRUE;
-	}
+		return OnFilesChanged(hDlg, wParam, lParam);
 
 	case UM_UPLOAD_FILES:
-		UploadFiles(hDlg);
+		dirTreeInstance.UploadFiles(hDlg);
 		return (INT_PTR)TRUE;
+
+	case UM_UPLOAD_COMPLETE:
+		return OnUploadComplete(hDlg);
 
 	case UM_CHECK_LOGIN:
-		if (!loginHandler.IsLoggedIn()) {
-			if (settingsHandler.HaveCredentials()) {
-				if (loginHandler.LogIn(settingsHandler.GetUserID(), settingsHandler.GetPass())) {
-					PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
-				} else {
-					settingsHandler.SetCreds(L"", L"");
-					settingsHandler.SaveSettings();
-					if (DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc)) {
-						PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
-					}
-				}
-				
-			} else {
-				if (DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_LOGIN), hDlg, LoginDlgProc)) {
-					PostMessage(hDlg, UM_LOGIN_COMPLETE, NULL, NULL);
-				}
-			}
-		}
-		
-		return (INT_PTR)TRUE;
+		return OnCheckLogin(hDlg);
 
 	case UM_LOGIN_COMPLETE:
-	{
-		std::wstring wideStr;
-		s2ws(loginHandler.loginTrace, wideStr);
-		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"Sign In responce:\r\n" + wideStr + L"\r\n");
-
-		ShowRemoteTree(hDlg);
-
-		InitGUIControls(hDlg);
-
-		// start new thread to check updates
-		std::thread checkUpdatesThread(&CUpdateHandler::CheckUpdates, std::ref(updateHandler), hDlg);
-		checkUpdatesThread.detach();
-
-		return (INT_PTR)TRUE;
-	}
+		return OnLoginComplete(hDlg);
 
 	case UM_HAVE_UPDATES:
 		DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_UPDATE), hDlg, UpdateDlgProc);
@@ -384,46 +314,16 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		switch (LOWORD(wParam))
 		{
 		case IDCANCEL:
-			loginHandler.LogOut();
-			EndDialog(hDlg, LOWORD(wParam));
-			PostQuitMessage(0);
-			return (INT_PTR)TRUE;
+			return OnExitClicked(hDlg, wParam);
 
 		case IDC_BUTTON_LOGOUT:
-			settingsHandler.SetCreds(L"", L"");
-			settingsHandler.SaveSettings();
-			loginHandler.LogOut();
-			PostMessage(hDlg, UM_CHECK_LOGIN, NULL, NULL);
-
-			return (INT_PTR)TRUE;
+			return OnLogOutClicked(hDlg);
 
 		case IDC_BUTTON_UPFOLDER:
-			
-			if (SelectPathDialog(path)) {
-				settingsHandler.SetSyncPath(path);
-				settingsHandler.SaveSettings();
-
-				SetWindowText(GetDlgItem(hDlg, IDC_STATIC_UPFOLDER), (i18nHelper.Geti18nItem("folder_lb") + L"\n" + path).c_str());
-				EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), true);
-				
-				ShowLocalTree(hDlg);
-			}
-
-			return (INT_PTR)TRUE;
+			return OnSetFolderClicked(hDlg);
 
 		case IDC_BUTTON_UPLOAD:
-
-			EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), FALSE);
-			SetWindowText(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), i18nHelper.Geti18nItem("upload_btn_dis").c_str());
-			PostMessage(hDlg, UM_UPLOAD_FILES, NULL, NULL);
-
-			return (INT_PTR)TRUE;
-
-		// Settings menu
-		/*case IDM_SETTINGS:
-			DialogBox(hInst, MAKEINTRESOURCE(IDD_DIALOG_SETTINGS), hDlg, SettingsDlgProc);
-			return (INT_PTR)TRUE;*/
-
+			return OnUploadClicked(hDlg);
 		}
 	}
 	return (INT_PTR)FALSE;

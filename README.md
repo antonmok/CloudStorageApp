@@ -1,3 +1,3 @@
 # CloudStorageApp
 
-Current version is 1.0.3
+Current version is 1.0.4

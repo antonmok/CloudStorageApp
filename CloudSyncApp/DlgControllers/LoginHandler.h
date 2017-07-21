@@ -24,12 +24,12 @@ public:
 	bool IsLoggedIn();
 	bool LogIn(const std::wstring& userID, const std::wstring& pass);
 	bool SignUp(const std::wstring& userID, const std::wstring& pass, const std::wstring& fname, const std::wstring& lname);
+	void HandleCredentials(HWND hDlg, WPARAM wParam);
 	void LogOut();
 	const std::string& GetToken();
 
-	/*******/
+	// TODO: remove
 	std::string loginTrace;
-	/*******/
 
 private:
 

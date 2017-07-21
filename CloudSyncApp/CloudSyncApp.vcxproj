@@ -92,6 +92,7 @@
     <ClInclude Include="DlgControllers\MainDlg.h" />
     <ClInclude Include="DlgControllers\SettingsHandler.h" />
     <ClInclude Include="DlgControllers\UpdatesHandler.h" />
+    <ClInclude Include="Include\EncodingHelper.h" />
     <ClInclude Include="Include\FolderStruct.h" />
     <ClInclude Include="Include\Helpers.h" />
     <ClInclude Include="Include\i18n.h" />
@@ -106,6 +107,7 @@
     <ClCompile Include="DlgControllers\MainDlg.cpp" />
     <ClCompile Include="DlgControllers\SettingsHandler.cpp" />
     <ClCompile Include="DlgControllers\UpdatesHandler.cpp" />
+    <ClCompile Include="Source\EncodingHelper.cpp" />
     <ClCompile Include="Source\FolderStruct.cpp" />
     <ClCompile Include="Source\Helpers.cpp" />
     <ClCompile Include="Source\i18n.cpp" />

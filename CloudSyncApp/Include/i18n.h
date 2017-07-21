@@ -35,7 +35,7 @@ public:
 
 	const std::wstring& Geti18nItem(const std::string& key);
 
-	void Seti18nDataFromJSON(const std::string& json);
+	void GetTranslationsFromServer();
 	void SetLangCode(ELangCode languageCode);
 	void SetLangCode(const std::wstring& languageCode);
 	ELangCode GetLangCode();
@@ -45,8 +45,9 @@ private:
 	Ci18n();
 	~Ci18n() {}
 
-	void Ci18n::UpdateI18nItem(const std::string& key, const Si18nItem& item);
+	void UpdateI18nItem(const std::string& key, const Si18nItem& item);
 	void SetLangCodeFromSystemLocale();
+	void Seti18nDataFromJSON(const std::string& json);
 
 	std::map<std::string, Si18nItem> i18nData;
 	ELangCode langCode;
