@@ -207,6 +207,11 @@ INT_PTR OnLoginComplete(HWND hDlg)
 	std::thread checkUpdatesThread(&CUpdateHandler::CheckUpdates, std::ref(updateHandler), hDlg);
 	checkUpdatesThread.detach();
 
+	if (settingsHandler.GetSyncPath() != L"") {
+		SetUIToUploadState(hDlg);
+		PostMessage(hDlg, UM_UPLOAD_FILES, 0, 0);
+	}
+
 	return (INT_PTR)TRUE;
 }
 
@@ -241,6 +246,9 @@ INT_PTR OnSetFolderClicked(HWND hDlg)
 		// start new thread to listen for files changes
 		dirTreeInstance.WatchDirectory(settingsHandler.GetSyncPath(), hDlg);
 		ShowLocalTree(hDlg);
+
+		SetUIToUploadState(hDlg);
+		PostMessage(hDlg, UM_UPLOAD_FILES, 0, 0);
 	}
 
 	return (INT_PTR)TRUE;
@@ -254,10 +262,12 @@ INT_PTR OnUploadClicked(HWND hDlg)
 	return (INT_PTR)TRUE;
 }
 
-INT_PTR OnUploadComplete(HWND hDlg)
+INT_PTR OnUploadComplete(HWND hDlg, int success)
 {
-	EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"\r\n");
-	ShowRemoteTree(hDlg);
+	if (success) {
+		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"\r\n");
+		ShowRemoteTree(hDlg);
+	}
 
 	EnableWindow(GetDlgItem(hDlg, IDC_BUTTON_UPLOAD), TRUE);
 	SendMessage(GetDlgItem(hDlg, IDC_PROGRESS), PBM_SETMARQUEE, 0, 0);
@@ -291,7 +301,7 @@ INT_PTR CALLBACK MainDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPar
 		return (INT_PTR)TRUE;
 
 	case UM_UPLOAD_COMPLETE:
-		return OnUploadComplete(hDlg);
+		return OnUploadComplete(hDlg, wParam);
 
 	case UM_CHECK_LOGIN:
 		return OnCheckLogin(hDlg);

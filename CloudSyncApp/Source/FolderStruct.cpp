@@ -419,10 +419,10 @@ void CDirectoryTree::UploadFilesFunc(HWND hDlg)
 		};
 
 		IterateTree(UploadObjects, false);
-		PostMessage(hDlg, UM_UPLOAD_COMPLETE, 0, 0);
+		PostMessage(hDlg, UM_UPLOAD_COMPLETE, true, 0);
 	} else {
-		PostMessage(hDlg, UM_UPLOAD_COMPLETE, 0, 0);
-		MessageBox(hDlg, L"Upload directory is empty", L"Error", MB_ICONEXCLAMATION);
+		PostMessage(hDlg, UM_UPLOAD_COMPLETE, false, 0);
+		EditAppendText(GetDlgItem(hDlg, IDC_EDIT_TRACE), L"\nUpload directory is empty\n");
 	}
 }
 
